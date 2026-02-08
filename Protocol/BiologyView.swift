@@ -45,8 +45,27 @@ struct BiologyView: View {
                         if biomarkers.isEmpty {
                             emptyState
                         } else {
-                            ForEach(biomarkers) { biomarker in
-                                BiomarkerRow(biomarker: biomarker)
+                            ForEach(groupedBiomarkers) { group in
+                                VStack(spacing: 12) {
+                                    HStack {
+                                        Text(group.category.rawValue)
+                                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                        Spacer()
+                                    }
+                                    ForEach(group.items) { item in
+                                        NavigationLink {
+                                            BiomarkerDetailView(
+                                                title: item.name,
+                                                templateKey: item.templateKey,
+                                                category: item.category
+                                            )
+                                        } label: {
+                                            BiomarkerSummaryRow(item: item)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
                             }
                         }
                     }
@@ -113,6 +132,29 @@ struct BiologyView: View {
         }
         .padding(.horizontal, 4)
     }
+
+    private var groupedBiomarkers: [BiomarkerCategoryGroup] {
+        let grouped = Dictionary(grouping: biomarkers) { $0.category }
+        return grouped
+            .map { category, items in
+                let byName = Dictionary(grouping: items) { $0.templateKey ?? $0.name }
+                let summaries = byName.values.compactMap { values -> BiomarkerSummary? in
+                    guard let latest = values.sorted(by: { $0.date > $1.date }).first else { return nil }
+                    return BiomarkerSummary(
+                        name: latest.name,
+                        templateKey: latest.templateKey,
+                        category: latest.category,
+                        latestValue: latest.value,
+                        unit: latest.unit,
+                        date: latest.date
+                    )
+                }
+                .sorted { $0.name < $1.name }
+
+                return BiomarkerCategoryGroup(category: category, items: summaries)
+            }
+            .sorted { $0.category.rawValue < $1.category.rawValue }
+    }
 }
 
 private struct BiomarkerRow: View {
@@ -133,11 +175,48 @@ private struct BiomarkerRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 6) {
-                Text("\(biomarker.value, specifier: "%.2f") \(biomarker.unit.rawValue)")
-                    .font(.system(.headline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.white)
+                HStack(spacing: 6) {
+                    Text("\(biomarker.value, specifier: "%.2f")")
+                        .font(.system(.headline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(biomarker.unit.rawValue)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
 
                 Text(biomarker.date, style: .date)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .glassCard()
+    }
+}
+
+private struct BiomarkerSummaryRow: View {
+    let item: BiomarkerSummary
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.name)
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("\(item.latestValue, specifier: "%.2f")")
+                        .font(.system(.headline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(item.unit.rawValue)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+
+                Text(item.date, style: .date)
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -171,6 +250,154 @@ private struct LabReportRow: View {
             .foregroundStyle(Color.neonCyan)
         }
         .glassCard()
+    }
+}
+
+private struct BiomarkerSummary: Identifiable, Hashable {
+    let id = UUID()
+    let name: String
+    let templateKey: String?
+    let category: BiomarkerCategory
+    let latestValue: Double
+    let unit: BiomarkerUnit
+    let date: Date
+}
+
+private struct BiomarkerCategoryGroup: Identifiable {
+    let id = UUID()
+    let category: BiomarkerCategory
+    let items: [BiomarkerSummary]
+}
+
+private struct BiomarkerDetailView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var records: [Biomarker]
+
+    @State private var selectedBiomarkerForEdit: Biomarker?
+
+    private let title: String
+    private let templateKey: String?
+    private let category: BiomarkerCategory
+
+    init(title: String, templateKey: String?, category: BiomarkerCategory) {
+        self.title = title
+        self.templateKey = templateKey
+        self.category = category
+
+        if let key = templateKey {
+            _records = Query(
+                filter: #Predicate<Biomarker> { $0.templateKey == key },
+                sort: [SortDescriptor(\Biomarker.date, order: .reverse)]
+            )
+        } else {
+            _records = Query(
+                filter: #Predicate<Biomarker> { $0.name == title && $0.category == category },
+                sort: [SortDescriptor(\Biomarker.date, order: .reverse)]
+            )
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.voidBackground.ignoresSafeArea()
+
+            List {
+                ForEach(records) { record in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Text("\(record.value, specifier: "%.2f")")
+                                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                                    .foregroundStyle(.white)
+                                Text(record.unit.rawValue)
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            Text(record.date, style: .date)
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                    .contextMenu {
+                        Button("Edit") { selectedBiomarkerForEdit = record }
+                        Button("Delete", role: .destructive) {
+                            modelContext.delete(record)
+                        }
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle(title)
+        .sheet(item: $selectedBiomarkerForEdit) { biomarker in
+            EditBiomarkerSheet(biomarker: biomarker)
+        }
+    }
+}
+
+private struct EditBiomarkerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var biomarker: Biomarker
+
+    @State private var valueText: String = ""
+    @State private var selectedDate: Date = Date()
+    @State private var selectedUnit: BiomarkerUnit = .mgdL
+    @State private var showInvalidValueAlert = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Biomarker") {
+                    Text(biomarker.name)
+                        .font(.system(.headline, design: .rounded))
+                }
+
+                Section("Result") {
+                    TextField("Value", text: $valueText)
+                        .keyboardType(.decimalPad)
+
+                    Picker("Unit", selection: $selectedUnit) {
+                        ForEach(BiomarkerUnit.allCases) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
+                    }
+
+                    DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
+                }
+            }
+            .navigationTitle("Edit Result")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                }
+            }
+            .onAppear {
+                valueText = String(format: "%.2f", biomarker.value)
+                selectedDate = biomarker.date
+                selectedUnit = biomarker.unit
+            }
+            .alert("Invalid value", isPresented: $showInvalidValueAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Enter a numeric value using your locale format.")
+            }
+        }
+    }
+
+    private func save() {
+        guard let value = NumberParser.parse(valueText) else {
+            showInvalidValueAlert = true
+            return
+        }
+        biomarker.value = value
+        biomarker.unit = selectedUnit
+        biomarker.date = selectedDate
+        dismiss()
     }
 }
 
