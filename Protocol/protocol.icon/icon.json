@@ -1,0 +1,31 @@
+{
+  "fill" : {
+    "solid" : "display-p3:0.01961,0.01961,0.03748,1.00000"
+  },
+  "groups" : [
+    {
+      "blend-mode" : "normal",
+      "layers" : [
+        {
+          "fill" : "none",
+          "image-name" : "waveform.path.ecg.png",
+          "name" : "waveform.path.ecg"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

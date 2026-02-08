@@ -3,12 +3,23 @@ import SwiftData
 
 @main
 struct ProtocolApp: App {
-    // We are temporarily removing the ModelContainer setup.
-    // We will add it back in Step 2 once the AI creates our new 'Biomarker' and 'Supplement' models.
-    
+    private var sharedModelContainer: ModelContainer = {
+        let schema = Schema([Biomarker.self])
+        let configuration = ModelConfiguration(
+            cloudKitDatabase: .private("iCloud.com.31b4.Protocol")
+        )
+
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
+    }()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(sharedModelContainer)
     }
 }
