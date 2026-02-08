@@ -1,32 +1,14 @@
-//
-//  ProtocolApp.swift
-//  Protocol
-//
-//  Created by Bence Szilagyi on 2/8/26.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct ProtocolApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
+    // We are temporarily removing the ModelContainer setup.
+    // We will add it back in Step 2 once the AI creates our new 'Biomarker' and 'Supplement' models.
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
     }
 }
