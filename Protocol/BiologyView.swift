@@ -4,27 +4,55 @@ import SwiftData
 struct BiologyView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Biomarker.date, order: .reverse) private var biomarkers: [Biomarker]
+    @Query(sort: \LabReport.importedAt, order: .reverse) private var reports: [LabReport]
 
     @State private var isAdding = false
+    @State private var isImporting = false
+    @State private var selectedReport: LabReport?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.voidBackground.ignoresSafeArea()
 
-                if biomarkers.isEmpty {
-                    emptyState
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        Button {
+                            isImporting = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "doc.badge.plus")
+                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                Text("Import PDF")
+                                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .glassCard()
+
+                        if reports.isEmpty == false {
+                            sectionHeader("Saved Reports")
+                            ForEach(reports) { report in
+                                LabReportRow(report: report) {
+                                    selectedReport = report
+                                }
+                            }
+                        }
+
+                        sectionHeader("Tracked Biomarkers")
+
+                        if biomarkers.isEmpty {
+                            emptyState
+                        } else {
                             ForEach(biomarkers) { biomarker in
                                 BiomarkerRow(biomarker: biomarker)
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 24)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationTitle("Biology")
@@ -41,6 +69,18 @@ struct BiologyView: View {
             }
             .sheet(isPresented: $isAdding) {
                 AddBiomarkerSheet()
+            }
+            .sheet(isPresented: $isImporting) {
+                PDFImportView()
+            }
+            .sheet(isPresented: Binding(get: { selectedReport != nil }, set: { if !$0 { selectedReport = nil } })) {
+                if let report = selectedReport, let data = report.pdfData {
+                    PDFViewer(data: data)
+                } else {
+                    Text("PDF not available")
+                        .foregroundStyle(.white)
+                        .padding()
+                }
             }
         }
     }
@@ -62,7 +102,16 @@ struct BiologyView: View {
                 .padding(.horizontal, 32)
         }
         .glassCard()
-        .padding(.horizontal, 24)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(.white.opacity(0.7))
+            Spacer()
+        }
+        .padding(.horizontal, 4)
     }
 }
 
@@ -92,6 +141,34 @@ private struct BiomarkerRow: View {
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.white.opacity(0.7))
             }
+        }
+        .glassCard()
+    }
+}
+
+private struct LabReportRow: View {
+    let report: LabReport
+    let onOpen: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(report.title)
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text(report.reportDate, style: .date)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+
+            Spacer()
+
+            Button("View") {
+                onOpen()
+            }
+            .font(.system(.caption, design: .rounded).weight(.semibold))
+            .foregroundStyle(Color.neonCyan)
         }
         .glassCard()
     }

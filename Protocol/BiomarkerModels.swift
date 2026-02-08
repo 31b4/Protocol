@@ -3,6 +3,7 @@ import SwiftData
 
 enum BiomarkerUnit: String, Codable, CaseIterable, Identifiable {
     case mgdL = "mg/dL"
+    case mgL = "mg/L"
     case mmoll = "mmol/L"
     case ngmL = "ng/mL"
     case iul = "IU/L"
@@ -41,6 +42,7 @@ final class Biomarker {
     var minReference: Double?
     var maxReference: Double?
     var templateKey: String?
+    var reportID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -51,7 +53,8 @@ final class Biomarker {
         category: BiomarkerCategory,
         minReference: Double? = nil,
         maxReference: Double? = nil,
-        templateKey: String? = nil
+        templateKey: String? = nil,
+        reportID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -62,5 +65,36 @@ final class Biomarker {
         self.minReference = minReference
         self.maxReference = maxReference
         self.templateKey = templateKey
+        self.reportID = reportID
+    }
+}
+
+@Model
+final class LabReport {
+    var id: UUID = UUID()
+    var title: String = ""
+    var reportDate: Date = Date()
+    var importedAt: Date = Date()
+    var sourceFilename: String = ""
+    var rawText: String?
+
+    @Attribute(.externalStorage) var pdfData: Data?
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        reportDate: Date,
+        importedAt: Date = Date(),
+        sourceFilename: String,
+        rawText: String? = nil,
+        pdfData: Data? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.reportDate = reportDate
+        self.importedAt = importedAt
+        self.sourceFilename = sourceFilename
+        self.rawText = rawText
+        self.pdfData = pdfData
     }
 }
