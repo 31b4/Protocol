@@ -563,12 +563,22 @@ enum UnitParser {
         ("mg/dl", .mgdL),
         ("mg/l", .mgL),
         ("mmol/l", .mmoll),
+        ("nmol/l", .nmoll),
         ("ng/ml", .ngmL),
         ("iu/l", .iul),
         ("pg/ml", .pgmL),
         ("miu/l", .miuL),
         ("uiu/ml", .uiuML),
         ("umol/l", .umolL),
+        ("giga/l", .gigaL),
+        ("tera/l", .teraL),
+        ("g/l", .gL),
+        ("fl", .fL),
+        ("pg", .pg),
+        ("mm/hour", .mmHour),
+        ("ml/min/1.73m2", .mlMin173),
+        ("leu/ul", .leuUL),
+        ("l/l", .lL),
         ("%", .percent)
     ]
 

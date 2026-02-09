@@ -46,7 +46,7 @@ enum BiomarkerCatalog {
         BiomarkerTemplate(id: "hscrp", name: "High-Sensitivity C-Reactive Protein", category: .inflammation, defaultUnit: .mgL, aliases: ["hs-CRP", "CRP", "C-reaktív protein"], minReference: 0, maxReference: 3.0),
         BiomarkerTemplate(id: "il6", name: "Interleukin-6", category: .inflammation, defaultUnit: .pgmL, aliases: ["IL-6"]),
 
-        BiomarkerTemplate(id: "testosterone_total", name: "Testosterone (Total)", category: .hormones, defaultUnit: .ngmL, aliases: ["Tesztoszteron", "Testosterone Total"], minReference: 2.5, maxReference: 9.5),
+        BiomarkerTemplate(id: "testosterone_total", name: "Testosterone (Total)", category: .hormones, defaultUnit: .nmoll, aliases: ["Tesztoszteron", "Testosterone Total"], minReference: 2.5, maxReference: 27.35),
         BiomarkerTemplate(id: "testosterone_free", name: "Testosterone (Free)", category: .hormones, defaultUnit: .pgmL, aliases: ["Szabad tesztoszteron", "Free Testosterone"]),
         BiomarkerTemplate(id: "estradiol", name: "Estradiol (E2)", category: .hormones, defaultUnit: .pgmL, aliases: ["Ösztradiol", "Estradiol"]),
         BiomarkerTemplate(id: "dhea_s", name: "DHEA-S", category: .hormones, defaultUnit: .umolL, aliases: ["DHEA-S"]),
@@ -55,19 +55,36 @@ enum BiomarkerCatalog {
         BiomarkerTemplate(id: "ft3", name: "Free T3", category: .thyroid, defaultUnit: .pgmL, aliases: ["Szabad T3", "fT3"]),
         BiomarkerTemplate(id: "ft4", name: "Free T4", category: .thyroid, defaultUnit: .ngmL, aliases: ["Szabad T4", "fT4"]),
 
-        BiomarkerTemplate(id: "hemoglobin", name: "Hemoglobin", category: .hematology, defaultUnit: .mgdL, aliases: ["Hemoglobin", "Hgb", "Hb"]),
-        BiomarkerTemplate(id: "hematocrit", name: "Hematocrit", category: .hematology, defaultUnit: .percent, aliases: ["Hematokrit", "HCT"]),
+        BiomarkerTemplate(id: "esr", name: "Erythrocyte Sedimentation Rate", category: .inflammation, defaultUnit: .mmHour, aliases: ["Vörösvérsejt süllyedés", "Süllyedés", "ESR"], minReference: 2, maxReference: 15),
+        BiomarkerTemplate(id: "wbc", name: "White Blood Cell Count", category: .hematology, defaultUnit: .gigaL, aliases: ["Fehérvérsejtszám", "WBC", "Fehérvérsejt"], minReference: 4.0, maxReference: 10.0),
+        BiomarkerTemplate(id: "rbc", name: "Red Blood Cell Count", category: .hematology, defaultUnit: .teraL, aliases: ["Vörösvérsejtszám", "RBC"], minReference: 4.5, maxReference: 6.0),
+        BiomarkerTemplate(id: "hemoglobin", name: "Hemoglobin", category: .hematology, defaultUnit: .gL, aliases: ["Hemoglobin", "Hgb", "Hb"], minReference: 140, maxReference: 180),
+        BiomarkerTemplate(id: "hematocrit", name: "Hematocrit", category: .hematology, defaultUnit: .lL, aliases: ["Hematokrit", "HCT"], minReference: 0.36, maxReference: 0.54),
+        BiomarkerTemplate(id: "mcv", name: "MCV", category: .hematology, defaultUnit: .fL, aliases: ["MCV", "Mean Corpuscular Volume"], minReference: 80.0, maxReference: 95.0),
+        BiomarkerTemplate(id: "mch", name: "MCH", category: .hematology, defaultUnit: .pg, aliases: ["MCH", "Mean Corpuscular Hemoglobin"], minReference: 24.0, maxReference: 34.0),
+        BiomarkerTemplate(id: "mchc", name: "MCHC", category: .hematology, defaultUnit: .gL, aliases: ["MCHC", "Mean Corpuscular Hemoglobin Concentration"], minReference: 305, maxReference: 355),
+        BiomarkerTemplate(id: "rdw", name: "RDW-CV", category: .hematology, defaultUnit: .percent, aliases: ["RDW-CV", "RDW"], minReference: 11.6, maxReference: 13.7),
+        BiomarkerTemplate(id: "platelets", name: "Platelet Count", category: .hematology, defaultUnit: .gigaL, aliases: ["Trombocitaszám", "Platelets", "PLT"], minReference: 150, maxReference: 400),
+        BiomarkerTemplate(id: "mpv", name: "MPV", category: .hematology, defaultUnit: .fL, aliases: ["MPV", "Mean Platelet Volume"], minReference: 7.8, maxReference: 11.0),
         BiomarkerTemplate(id: "ferritin", name: "Ferritin", category: .hematology, defaultUnit: .ngmL, aliases: ["Ferritin"], minReference: 30, maxReference: 400),
 
-        BiomarkerTemplate(id: "creatinine", name: "Creatinine", category: .kidney, defaultUnit: .mgdL, aliases: ["Kreatinin", "Creatinine"], minReference: 0.6, maxReference: 1.3),
-        BiomarkerTemplate(id: "bun", name: "BUN", category: .kidney, defaultUnit: .mgdL, aliases: ["Karbamid", "Urea", "BUN"], minReference: 7, maxReference: 20),
+        BiomarkerTemplate(id: "creatinine", name: "Creatinine", category: .kidney, defaultUnit: .umolL, aliases: ["Kreatinin", "Creatinine"], minReference: 74, maxReference: 120),
+        BiomarkerTemplate(id: "urea", name: "Urea", category: .kidney, defaultUnit: .mmoll, aliases: ["Karbamid", "Urea"], minReference: 2.5, maxReference: 7.5),
+        BiomarkerTemplate(id: "bun", name: "BUN", category: .kidney, defaultUnit: .mgdL, aliases: ["BUN"], minReference: 7, maxReference: 20),
+        BiomarkerTemplate(id: "egfr", name: "eGFR (EPI)", category: .kidney, defaultUnit: .mlMin173, aliases: ["EGFR", "EGFR-EPI"], minReference: 90, maxReference: 200),
+        BiomarkerTemplate(id: "uric_acid", name: "Uric Acid", category: .kidney, defaultUnit: .umolL, aliases: ["Húgysav", "Uric acid"], minReference: 200, maxReference: 416),
 
         BiomarkerTemplate(id: "alt", name: "ALT", category: .liver, defaultUnit: .iul, aliases: ["ALT", "GPT", "ALAT"], minReference: 7, maxReference: 56),
         BiomarkerTemplate(id: "ast", name: "AST", category: .liver, defaultUnit: .iul, aliases: ["AST", "GOT", "ASAT"], minReference: 10, maxReference: 40),
+        BiomarkerTemplate(id: "bilirubin_total", name: "Total Bilirubin", category: .liver, defaultUnit: .umolL, aliases: ["Összbilirubin", "Total bilirubin"], minReference: 5.1, maxReference: 17.1),
+        BiomarkerTemplate(id: "ggt", name: "Gamma-GT", category: .liver, defaultUnit: .iul, aliases: ["Gamma-GT", "GGT"], minReference: 11, maxReference: 61),
+        BiomarkerTemplate(id: "alp", name: "Alkaline Phosphatase", category: .liver, defaultUnit: .iul, aliases: ["Alkalikus foszfatáz", "ALP"], minReference: 44, maxReference: 147),
         BiomarkerTemplate(id: "albumin", name: "Albumin", category: .liver, defaultUnit: .mgdL, aliases: ["Albumin"], minReference: 3.5, maxReference: 5.0),
 
         BiomarkerTemplate(id: "sodium", name: "Sodium", category: .electrolytes, defaultUnit: .mmoll, aliases: ["Nátrium", "Sodium"], minReference: 135, maxReference: 145),
-        BiomarkerTemplate(id: "potassium", name: "Potassium", category: .electrolytes, defaultUnit: .mmoll, aliases: ["Kálium", "Potassium"], minReference: 3.5, maxReference: 5.1)
+        BiomarkerTemplate(id: "potassium", name: "Potassium", category: .electrolytes, defaultUnit: .mmoll, aliases: ["Kálium", "Potassium"], minReference: 3.5, maxReference: 5.1),
+        BiomarkerTemplate(id: "magnesium", name: "Magnesium", category: .electrolytes, defaultUnit: .mmoll, aliases: ["Magnézium", "Magnesium"], minReference: 0.7, maxReference: 1.05),
+        BiomarkerTemplate(id: "non_hdl", name: "Non-HDL Cholesterol", category: .lipids, defaultUnit: .mmoll, aliases: ["non-HDL", "Non-HDL"], minReference: 0.92, maxReference: 2.50)
     ]
 
     static func search(_ query: String) -> [BiomarkerTemplate] {
