@@ -36,17 +36,6 @@ private struct DashboardView: View {
     }
 }
 
-private struct ProtocolsView: View {
-    var body: some View {
-        ZStack {
-            Color.voidBackground.ignoresSafeArea()
-            Text("Protocols")
-                .font(.system(.title2, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.7))
-        }
-    }
-}
-
 #Preview {
     ContentView()
 }
