@@ -34,6 +34,7 @@ final class ProtocolPlan {
     var name: String = ""
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var isActive: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \ProtocolVersion.plan) var versions: [ProtocolVersion]?
 
@@ -42,12 +43,14 @@ final class ProtocolPlan {
         name: String,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
+        isActive: Bool = true,
         versions: [ProtocolVersion]? = nil
     ) {
         self.id = id
         self.name = name
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.isActive = isActive
         self.versions = versions
     }
 }
