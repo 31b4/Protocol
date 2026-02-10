@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Protocol needs access to read your health data to provide personalized health insights and tracking.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Protocol needs permission to save your supplement and nutrition data to HealthKit for comprehensive health tracking.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

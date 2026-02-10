@@ -153,21 +153,30 @@ final class ProtocolLog {
 final class ProtocolLogItem {
     var id: UUID = UUID()
     var supplementName: String = ""
+    var supplementKey: String?
     var amount: Double = 0
     var unit: SupplementUnit = SupplementUnit.mg
     var log: ProtocolLog?
+    var healthKitSampleUUID: String?
+    var healthKitTypeIdentifier: String?
 
     init(
         id: UUID = UUID(),
         supplementName: String,
+        supplementKey: String? = nil,
         amount: Double,
         unit: SupplementUnit,
-        log: ProtocolLog? = nil
+        log: ProtocolLog? = nil,
+        healthKitSampleUUID: String? = nil,
+        healthKitTypeIdentifier: String? = nil
     ) {
         self.id = id
         self.supplementName = supplementName
+        self.supplementKey = supplementKey
         self.amount = amount
         self.unit = unit
         self.log = log
+        self.healthKitSampleUUID = healthKitSampleUUID
+        self.healthKitTypeIdentifier = healthKitTypeIdentifier
     }
 }

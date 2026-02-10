@@ -7,6 +7,8 @@ struct DashboardView: View {
     @Query(sort: \ProtocolLog.createdAt, order: .reverse) private var logs: [ProtocolLog]
     @State private var selectedDate: Date = Date()
     @State private var showDatePicker = false
+    @State private var showSettings = false
+    @AppStorage("healthkit_enabled") private var healthKitEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -40,6 +42,15 @@ struct DashboardView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                    .accessibilityLabel("Settings")
+                }
                 ToolbarItem(placement: .principal) {
                     Button {
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
@@ -56,6 +67,9 @@ struct DashboardView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .overlay {
                 if showDatePicker {
@@ -124,8 +138,10 @@ struct DashboardView: View {
     private func toggleLog(for plan: ProtocolPlan, slot: ProtocolSlot, items: [ProtocolItem]) {
         guard let version = plan.currentVersion else { return }
         let day = selectedDate.startOfDay
-
         if let existing = logs.first(where: { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }) {
+            if healthKitEnabled, let logItems = existing.items {
+                Task { try? await HealthKitManager.shared.deleteSamples(items: logItems) }
+            }
             modelContext.delete(existing)
             return
         }
@@ -140,6 +156,7 @@ struct DashboardView: View {
         let logItems = items.map {
             ProtocolLogItem(
                 supplementName: $0.supplementName,
+                supplementKey: $0.supplementKey,
                 amount: $0.amount,
                 unit: $0.unit,
                 log: log
@@ -147,6 +164,10 @@ struct DashboardView: View {
         }
         log.items = logItems
         modelContext.insert(log)
+
+        if healthKitEnabled {
+            Task { try? await HealthKitManager.shared.saveNutritionSamples(items: logItems, date: day) }
+        }
     }
 
     private func dateTitle(for date: Date) -> String {
@@ -289,19 +310,30 @@ private struct LiquidGlassDatePicker: View {
                     onClose()
                 }
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .buttonStyle(.bordered)
-                .tint(Color.neonCyan)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                )
 
                 Spacer()
 
                 Button {
                     onClose()
                 } label: {
-                    Text("Select")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
                 }
-                .buttonStyle(.bordered)
-                .tint(Color.neonCyan)
             }
         }
         .padding(20)
