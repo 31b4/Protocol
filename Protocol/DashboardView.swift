@@ -5,6 +5,8 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ProtocolPlan.updatedAt, order: .reverse) private var protocols: [ProtocolPlan]
     @Query(sort: \ProtocolLog.createdAt, order: .reverse) private var logs: [ProtocolLog]
+    @State private var selectedDate: Date = Date()
+    @State private var showDatePicker = false
 
     var body: some View {
         NavigationStack {
@@ -25,7 +27,8 @@ struct DashboardView: View {
                                     logs: logs,
                                     onToggle: { slot, items in
                                         toggleLog(for: plan, slot: slot, items: items)
-                                    }
+                                    },
+                                    selectedDate: selectedDate
                                 )
                             }
                         }
@@ -35,7 +38,50 @@ struct DashboardView: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Dashboard")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                            showDatePicker.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(dateTitle(for: selectedDate))
+                                .font(.system(.title3, design: .rounded).weight(.semibold))
+                                .foregroundStyle(.white)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
+                }
+            }
+            .overlay {
+                if showDatePicker {
+                    ZStack(alignment: .top) {
+                        Color.black.opacity(0.45)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                    showDatePicker = false
+                                }
+                            }
+
+                        LiquidGlassDatePicker(
+                            selectedDate: $selectedDate,
+                            onClose: {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                    showDatePicker = false
+                                }
+                            }
+                        )
+                        .padding(.top, 8)
+                        .padding(.horizontal, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+            }
         }
     }
 
@@ -77,7 +123,7 @@ struct DashboardView: View {
 
     private func toggleLog(for plan: ProtocolPlan, slot: ProtocolSlot, items: [ProtocolItem]) {
         guard let version = plan.currentVersion else { return }
-        let day = Date().startOfDay
+        let day = selectedDate.startOfDay
 
         if let existing = logs.first(where: { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }) {
             modelContext.delete(existing)
@@ -102,6 +148,26 @@ struct DashboardView: View {
         log.items = logItems
         modelContext.insert(log)
     }
+
+    private func dateTitle(for date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Today, \(formattedDate(date))"
+        }
+        if calendar.isDateInYesterday(date) {
+            return "Yesterday, \(formattedDate(date))"
+        }
+        if calendar.isDateInTomorrow(date) {
+            return "Tomorrow, \(formattedDate(date))"
+        }
+        return formattedDate(date)
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d"
+        return formatter.string(from: date)
+    }
 }
 
 private struct ProtocolLogCard: View {
@@ -109,6 +175,7 @@ private struct ProtocolLogCard: View {
     let currentVersion: ProtocolVersion?
     let logs: [ProtocolLog]
     let onToggle: (ProtocolSlot, [ProtocolItem]) -> Void
+    var selectedDate: Date = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -179,7 +246,7 @@ private struct ProtocolLogCard: View {
     }
 
     private func isLogged(slot: ProtocolSlot) -> Bool {
-        let day = Date().startOfDay
+        let day = selectedDate.startOfDay
         return logs.contains { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }
     }
 
@@ -195,6 +262,58 @@ private struct ProtocolLogCard: View {
 private extension Date {
     var startOfDay: Date {
         Calendar.current.startOfDay(for: self)
+    }
+}
+
+private struct LiquidGlassDatePicker: View {
+    @Binding var selectedDate: Date
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            DatePicker(
+                "",
+                selection: $selectedDate,
+                in: ...Date(),
+                displayedComponents: [.date]
+            )
+            .datePickerStyle(.graphical)
+            .tint(Color.neonCyan)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, -6)
+            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: selectedDate)
+
+            HStack {
+                Button("Today") {
+                    selectedDate = Date()
+                    onClose()
+                }
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .buttonStyle(.bordered)
+                .tint(Color.neonCyan)
+
+                Spacer()
+
+                Button {
+                    onClose()
+                } label: {
+                    Text("Select")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.neonCyan)
+            }
+        }
+        .padding(20)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
+        )
+        .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 16)
     }
 }
 
