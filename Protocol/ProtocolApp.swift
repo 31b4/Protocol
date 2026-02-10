@@ -4,13 +4,17 @@ import SwiftData
 @main
 struct ProtocolApp: App {
     private var sharedModelContainer: ModelContainer = {
-        let schema = Schema([Biomarker.self, LabReport.self, ProtocolPlan.self, ProtocolVersion.self, ProtocolItem.self, ProtocolLog.self])
+        let schema = Schema(versionedSchema: ProtocolSchemaV3.self)
         let configuration = ModelConfiguration(
             cloudKitDatabase: .private("iCloud.com.31b4.Protocol")
         )
 
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: ProtocolMigrationPlan.self,
+                configurations: [configuration]
+            )
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

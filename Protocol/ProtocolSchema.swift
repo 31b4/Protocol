@@ -10,12 +10,12 @@ enum ProtocolSchemaV1: VersionedSchema {
     }
 }
 
-// MARK: - Schema V2 (Biology + Protocols)
+// MARK: - Schema V3 (Biology + Protocols + Log Items)
 
-enum ProtocolSchemaV2: VersionedSchema {
-    static var versionIdentifier: Schema.Version { .init(2, 0, 0) }
+enum ProtocolSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(3, 0, 0) }
     static var models: [any PersistentModel.Type] {
-        [Biomarker.self, LabReport.self, ProtocolPlan.self, ProtocolVersion.self, ProtocolItem.self, ProtocolLog.self]
+        [Biomarker.self, LabReport.self, ProtocolPlan.self, ProtocolVersion.self, ProtocolItem.self, ProtocolLog.self, ProtocolLogItem.self]
     }
 }
 
@@ -23,12 +23,12 @@ enum ProtocolSchemaV2: VersionedSchema {
 
 enum ProtocolMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [ProtocolSchemaV1.self, ProtocolSchemaV2.self]
+        [ProtocolSchemaV1.self, ProtocolSchemaV3.self]
     }
 
     static var stages: [MigrationStage] {
         [
-            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV2.self)
+            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV3.self)
         ]
     }
 }

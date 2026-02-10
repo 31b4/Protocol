@@ -126,6 +126,8 @@ final class ProtocolLog {
     var status: ProtocolLogStatus = ProtocolLogStatus.completed
     var createdAt: Date = Date()
 
+    @Relationship(deleteRule: .cascade, inverse: \ProtocolLogItem.log) var items: [ProtocolLogItem]?
+
     init(
         id: UUID = UUID(),
         protocolID: UUID,
@@ -133,7 +135,8 @@ final class ProtocolLog {
         date: Date,
         slot: ProtocolSlot,
         status: ProtocolLogStatus,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        items: [ProtocolLogItem]? = nil
     ) {
         self.id = id
         self.protocolID = protocolID
@@ -142,5 +145,29 @@ final class ProtocolLog {
         self.slot = slot
         self.status = status
         self.createdAt = createdAt
+        self.items = items
+    }
+}
+
+@Model
+final class ProtocolLogItem {
+    var id: UUID = UUID()
+    var supplementName: String = ""
+    var amount: Double = 0
+    var unit: SupplementUnit = SupplementUnit.mg
+    var log: ProtocolLog?
+
+    init(
+        id: UUID = UUID(),
+        supplementName: String,
+        amount: Double,
+        unit: SupplementUnit,
+        log: ProtocolLog? = nil
+    ) {
+        self.id = id
+        self.supplementName = supplementName
+        self.amount = amount
+        self.unit = unit
+        self.log = log
     }
 }

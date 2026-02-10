@@ -25,17 +25,6 @@ struct ContentView: View {
     }
 }
 
-private struct DashboardView: View {
-    var body: some View {
-        ZStack {
-            Color.voidBackground.ignoresSafeArea()
-            Text("Dashboard")
-                .font(.system(.title2, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.7))
-        }
-    }
-}
-
 #Preview {
     ContentView()
 }
