@@ -369,7 +369,11 @@ private struct ExpandableSlotRow: View {
     }
 
     private func handleStatusChange(_ newStatus: ProtocolLogStatus) {
-        if status == .completed && newStatus != .completed {
+        if (status == .completed || status == .missed) && newStatus == .undecided {
+            onStatusChange(newStatus)
+            return
+        }
+        if (status == .completed && newStatus != .completed) || (status == .missed && newStatus != .missed) {
             pendingStatus = newStatus
             showConfirm = true
             return
