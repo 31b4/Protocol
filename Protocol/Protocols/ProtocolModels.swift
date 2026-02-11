@@ -21,6 +21,7 @@ enum SupplementUnit: String, Codable, CaseIterable, Identifiable {
 }
 
 enum ProtocolLogStatus: String, Codable, CaseIterable, Identifiable {
+    case undecided = "Undecided"
     case completed = "Completed"
     case missed = "Missed"
     case skipped = "Skipped"

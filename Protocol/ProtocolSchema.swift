@@ -19,10 +19,10 @@ enum ProtocolSchemaV4: VersionedSchema {
     }
 }
 
-// MARK: - Schema V6 (Log item supplement keys)
+// MARK: - Schema V7 (Log status update)
 
-enum ProtocolSchemaV6: VersionedSchema {
-    static var versionIdentifier: Schema.Version { .init(6, 0, 0) }
+enum ProtocolSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(7, 0, 0) }
     static var models: [any PersistentModel.Type] {
         [Biomarker.self, LabReport.self, ProtocolPlan.self, ProtocolVersion.self, ProtocolItem.self, ProtocolLog.self, ProtocolLogItem.self]
     }
@@ -32,12 +32,12 @@ enum ProtocolSchemaV6: VersionedSchema {
 
 enum ProtocolMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [ProtocolSchemaV1.self, ProtocolSchemaV6.self]
+        [ProtocolSchemaV1.self, ProtocolSchemaV7.self]
     }
 
     static var stages: [MigrationStage] {
         [
-            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV6.self)
+            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV7.self)
         ]
     }
 }

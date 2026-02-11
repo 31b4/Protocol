@@ -4,7 +4,7 @@ import SwiftData
 @main
 struct ProtocolApp: App {
     private var sharedModelContainer: ModelContainer = {
-        let schema = Schema(versionedSchema: ProtocolSchemaV6.self)
+        let schema = Schema(versionedSchema: ProtocolSchemaV7.self)
         let configuration = ModelConfiguration(
             cloudKitDatabase: .private("iCloud.com.31b4.Protocol")
         )

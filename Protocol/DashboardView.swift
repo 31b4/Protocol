@@ -27,8 +27,8 @@ struct DashboardView: View {
                                     plan: plan,
                                     currentVersion: plan.currentVersion,
                                     logs: logs,
-                                    onToggle: { slot, items in
-                                        toggleLog(for: plan, slot: slot, items: items)
+                                    onStatusChange: { slot, items, status in
+                                        setLogStatus(for: plan, slot: slot, items: items, status: status)
                                     },
                                     selectedDate: selectedDate
                                 )
@@ -135,14 +135,17 @@ struct DashboardView: View {
         .glassCard()
     }
 
-    private func toggleLog(for plan: ProtocolPlan, slot: ProtocolSlot, items: [ProtocolItem]) {
+    private func setLogStatus(for plan: ProtocolPlan, slot: ProtocolSlot, items: [ProtocolItem], status: ProtocolLogStatus) {
         guard let version = plan.currentVersion else { return }
         let day = selectedDate.startOfDay
         if let existing = logs.first(where: { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }) {
-            if healthKitEnabled, let logItems = existing.items {
+            if healthKitEnabled, let logItems = existing.items, existing.status == .completed, status != .completed {
                 Task { try? await HealthKitManager.shared.deleteSamples(items: logItems) }
             }
-            modelContext.delete(existing)
+            existing.status = status
+            if healthKitEnabled, status == .completed, let logItems = existing.items {
+                Task { try? await HealthKitManager.shared.saveNutritionSamples(items: logItems, date: day) }
+            }
             return
         }
 
@@ -151,7 +154,7 @@ struct DashboardView: View {
             versionID: version.id,
             date: day,
             slot: slot,
-            status: .completed
+            status: status
         )
         let logItems = items.map {
             ProtocolLogItem(
@@ -165,7 +168,7 @@ struct DashboardView: View {
         log.items = logItems
         modelContext.insert(log)
 
-        if healthKitEnabled {
+        if healthKitEnabled, status == .completed {
             Task { try? await HealthKitManager.shared.saveNutritionSamples(items: logItems, date: day) }
         }
     }
@@ -195,7 +198,7 @@ private struct ProtocolLogCard: View {
     let plan: ProtocolPlan
     let currentVersion: ProtocolVersion?
     let logs: [ProtocolLog]
-    let onToggle: (ProtocolSlot, [ProtocolItem]) -> Void
+    let onStatusChange: (ProtocolSlot, [ProtocolItem], ProtocolLogStatus) -> Void
     var selectedDate: Date = Date()
 
     var body: some View {
@@ -231,44 +234,28 @@ private struct ProtocolLogCard: View {
     }
 
     private func slotRow(_ slot: ProtocolSlot, items: [ProtocolItem]) -> some View {
-        let isDone = isLogged(slot: slot)
+        let status = loggedStatus(slot: slot)
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: icon(for: slot))
-                        .foregroundStyle(Color.neonCyan.opacity(0.85))
-                    Text(slot.rawValue)
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                Spacer()
-                Button {
-                    onToggle(slot, items)
-                } label: {
-                    Text(isDone ? "Taken" : "Mark Taken")
-                        .font(.system(.caption, design: .rounded).weight(.semibold))
-                        .foregroundStyle(isDone ? Color.neonCyan : .white)
-                }
+        return ExpandableSlotRow(
+            slot: slot,
+            items: items,
+            status: status,
+            onStatusChange: { newStatus in
+                onStatusChange(slot, items, newStatus)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(items) { item in
-                    Text("• \(item.supplementName) — \(item.amount, specifier: "%.2f") \(item.unit.rawValue)")
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-            }
-        }
+        )
     }
 
     private func items(for slot: ProtocolSlot, in version: ProtocolVersion) -> [ProtocolItem] {
         (version.items ?? []).filter { $0.slot == slot }
     }
 
-    private func isLogged(slot: ProtocolSlot) -> Bool {
+    private func loggedStatus(slot: ProtocolSlot) -> ProtocolLogStatus {
         let day = selectedDate.startOfDay
-        return logs.contains { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }
+        if let log = logs.first(where: { $0.protocolID == plan.id && $0.slot == slot && Calendar.current.isDate($0.date, inSameDayAs: day) }) {
+            return log.status
+        }
+        return .undecided
     }
 
     private func icon(for slot: ProtocolSlot) -> String {
@@ -276,6 +263,161 @@ private struct ProtocolLogCard: View {
         case .morning: return "sun.max.fill"
         case .daytime: return "sun.haze.fill"
         case .night: return "moon.stars.fill"
+        }
+    }
+
+    @ViewBuilder
+    private func statusSelector(status: ProtocolLogStatus, slot: ProtocolSlot, items: [ProtocolItem]) -> some View {
+        HStack(spacing: 8) {
+            StatusButton(label: "✕", isSelected: status == .missed) {
+                onStatusChange(slot, items, .missed)
+            }
+            StatusButton(label: "-", isSelected: status == .undecided) {
+                onStatusChange(slot, items, .undecided)
+            }
+            StatusButton(label: "✓", isSelected: status == .completed) {
+                onStatusChange(slot, items, .completed)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: status)
+    }
+}
+
+private struct ExpandableSlotRow: View {
+    let slot: ProtocolSlot
+    let items: [ProtocolItem]
+    let status: ProtocolLogStatus
+    let onStatusChange: (ProtocolLogStatus) -> Void
+
+    @State private var isExpanded = false
+    @State private var showConfirm = false
+    @State private var pendingStatus: ProtocolLogStatus?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: icon(for: slot))
+                        .foregroundStyle(Color.neonCyan.opacity(0.85))
+                    Text(slot.rawValue)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                Spacer()
+                statusSelector(status: status, onStatusChange: onStatusChange)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    isExpanded.toggle()
+                }
+            }
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(items) { item in
+                        Text("• \(item.supplementName) — \(item.amount, specifier: "%.2f") \(item.unit.rawValue)")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private func icon(for slot: ProtocolSlot) -> String {
+        switch slot {
+        case .morning: return "sun.max.fill"
+        case .daytime: return "sun.haze.fill"
+        case .night: return "moon.stars.fill"
+        }
+    }
+
+    @ViewBuilder
+    private func statusSelector(status: ProtocolLogStatus, onStatusChange: @escaping (ProtocolLogStatus) -> Void) -> some View {
+        HStack(spacing: 8) {
+            StatusButton(label: "✕", isSelected: status == .missed) {
+                handleStatusChange(.missed)
+            }
+            StatusButton(label: "-", isSelected: status == .undecided) {
+                handleStatusChange(.undecided)
+            }
+            StatusButton(label: "✓", isSelected: status == .completed) {
+                handleStatusChange(.completed)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: status)
+        .alert("Change status?", isPresented: $showConfirm) {
+            Button("Change", role: .destructive) {
+                if let pendingStatus {
+                    onStatusChange(pendingStatus)
+                }
+                pendingStatus = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingStatus = nil
+            }
+        } message: {
+            Text("This was marked as done. Are you sure you want to change it?")
+        }
+    }
+
+    private func handleStatusChange(_ newStatus: ProtocolLogStatus) {
+        if status == .completed && newStatus != .completed {
+            pendingStatus = newStatus
+            showConfirm = true
+            return
+        }
+        onStatusChange(newStatus)
+    }
+}
+
+private struct StatusButton: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(foregroundColor)
+                .frame(width: 36, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(backgroundColor)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var foregroundColor: Color {
+        if !isSelected { return .white.opacity(0.6) }
+        switch label {
+        case "✕": return Color.neonAmber
+        case "-": return Color.white.opacity(0.8)
+        case "✓": return Color.neonCyan
+        default: return .white
+        }
+    }
+
+    private var backgroundColor: Color {
+        if !isSelected { return Color.glassBorder.opacity(0.4) }
+        switch label {
+        case "✕": return Color.neonAmber.opacity(0.25)
+        case "-": return Color.white.opacity(0.12)
+        case "✓": return Color.neonCyan.opacity(0.25)
+        default: return Color.glassBorder.opacity(0.4)
         }
     }
 }
