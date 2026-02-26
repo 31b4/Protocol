@@ -19,6 +19,14 @@ struct ProtocolEditorView: View {
     @State private var initialDay: [ProtocolDraftItem] = []
     @State private var initialNight: [ProtocolDraftItem] = []
 
+    // Reminder state
+    @State private var morningNotif = true
+    @State private var dayNotif = true
+    @State private var nightNotif = true
+    @State private var morningTime = Date()
+    @State private var daytimeTime = Date()
+    @State private var nightTime = Date()
+
     var body: some View {
         NavigationStack {
             Form {
@@ -29,6 +37,8 @@ struct ProtocolEditorView: View {
                 slotEditorSection(.morning, items: $morningItems)
                 slotEditorSection(.daytime, items: $dayItems)
                 slotEditorSection(.night, items: $nightItems)
+
+                remindersEditorSection
             }
             .navigationTitle(protocolPlan == nil ? "New Protocol" : "Edit Protocol")
             .toolbar {
@@ -54,6 +64,7 @@ struct ProtocolEditorView: View {
                         dayItems = (grouped[.daytime] ?? []).map(ProtocolDraftItem.init)
                         nightItems = (grouped[.night] ?? []).map(ProtocolDraftItem.init)
                     }
+                    loadNotificationState(for: protocolPlan.id)
                 }
                 initialName = name
                 initialMorning = morningItems
@@ -71,6 +82,97 @@ struct ProtocolEditorView: View {
                 Text("Choose how to version this update.")
             }
         }
+    }
+
+    // MARK: - Reminders Editor Section
+
+    @ViewBuilder
+    private var remindersEditorSection: some View {
+        Section {
+            if !morningItems.isEmpty {
+                reminderToggleRow(slot: .morning, enabled: $morningNotif, time: $morningTime)
+            }
+            if !dayItems.isEmpty {
+                reminderToggleRow(slot: .daytime, enabled: $dayNotif, time: $daytimeTime)
+            }
+            if !nightItems.isEmpty {
+                reminderToggleRow(slot: .night, enabled: $nightNotif, time: $nightTime)
+            }
+
+            if morningItems.isEmpty && dayItems.isEmpty && nightItems.isEmpty {
+                Text("Add supplements to configure reminders")
+                    .foregroundStyle(.secondary)
+                    .font(.system(.subheadline, design: .rounded))
+            }
+        } header: {
+            Label("Reminders", systemImage: "bell.fill")
+        } footer: {
+            if !morningItems.isEmpty || !dayItems.isEmpty || !nightItems.isEmpty {
+                Text("Enable per-slot reminders. Times default to 8 AM, 2 PM, 6 PM.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reminderToggleRow(slot: ProtocolSlot, enabled: Binding<Bool>, time: Binding<Date>) -> some View {
+        VStack(spacing: 8) {
+            Toggle(isOn: enabled) {
+                HStack(spacing: 8) {
+                    Image(systemName: slotIcon(for: slot))
+                        .foregroundStyle(enabled.wrappedValue ? Color.neonCyan : .secondary)
+                        .frame(width: 20)
+                    Text(slot.rawValue)
+                        .font(.system(.subheadline, design: .rounded).weight(.medium))
+                }
+            }
+            .tint(Color.neonCyan)
+
+            if enabled.wrappedValue {
+                DatePicker("Notify at", selection: time, displayedComponents: .hourAndMinute)
+                    .font(.system(.caption, design: .rounded))
+            }
+        }
+        .padding(.vertical, 2)
+        .animation(.easeOut(duration: 0.2), value: enabled.wrappedValue)
+    }
+
+    private func slotIcon(for slot: ProtocolSlot) -> String {
+        switch slot {
+        case .morning: return "sun.max.fill"
+        case .daytime: return "sun.haze.fill"
+        case .night: return "moon.stars.fill"
+        }
+    }
+
+    private func loadNotificationState(for id: UUID) {
+        let mgr = NotificationManager.shared
+        morningNotif = mgr.slotEnabled(for: id, slot: .morning)
+        dayNotif = mgr.slotEnabled(for: id, slot: .daytime)
+        nightNotif = mgr.slotEnabled(for: id, slot: .night)
+        morningTime = mgr.date(from: mgr.time(for: id, slot: .morning))
+        daytimeTime = mgr.date(from: mgr.time(for: id, slot: .daytime))
+        nightTime = mgr.date(from: mgr.time(for: id, slot: .night))
+    }
+
+    private func saveNotificationState(for id: UUID) {
+        let mgr = NotificationManager.shared
+        mgr.setSlotEnabled(morningNotif, for: id, slot: .morning)
+        mgr.setSlotEnabled(dayNotif, for: id, slot: .daytime)
+        mgr.setSlotEnabled(nightNotif, for: id, slot: .night)
+        mgr.setTime(mgr.components(from: morningTime), for: id, slot: .morning)
+        mgr.setTime(mgr.components(from: daytimeTime), for: id, slot: .daytime)
+        mgr.setTime(mgr.components(from: nightTime), for: id, slot: .night)
+    }
+
+    private func rescheduleAll() {
+        let planDescriptor = FetchDescriptor<ProtocolPlan>()
+        let logDescriptor = FetchDescriptor<ProtocolLog>()
+        let plans = (try? modelContext.fetch(planDescriptor)) ?? []
+        let logs = (try? modelContext.fetch(logDescriptor)) ?? []
+        NotificationManager.shared.rescheduleAll(
+            activeProtocols: plans.filter { $0.isActive },
+            logs: logs
+        )
     }
 
     private func slotEditorSection(_ slot: ProtocolSlot, items: Binding<[ProtocolDraftItem]>) -> some View {
@@ -138,6 +240,8 @@ struct ProtocolEditorView: View {
                 let items = allItems.map { $0.toModel(version: newVersion) }
                 newVersion.items = items
                 protocolPlan.versions = [newVersion]
+                saveNotificationState(for: protocolPlan.id)
+                rescheduleAll()
                 dismiss()
                 return
             }
@@ -162,6 +266,9 @@ struct ProtocolEditorView: View {
                 newVersion.items = items
                 protocolPlan.versions = (protocolPlan.versions ?? []) + [newVersion]
             }
+
+            saveNotificationState(for: protocolPlan.id)
+            rescheduleAll()
         } else {
             let plan = ProtocolPlan(name: name)
             let version = ProtocolVersion(major: 1, minor: 0, plan: plan)
@@ -169,6 +276,9 @@ struct ProtocolEditorView: View {
             version.items = items
             plan.versions = [version]
             modelContext.insert(plan)
+
+            saveNotificationState(for: plan.id)
+            rescheduleAll()
         }
 
         dismiss()

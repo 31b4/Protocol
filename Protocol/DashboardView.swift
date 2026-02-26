@@ -146,6 +146,7 @@ struct DashboardView: View {
             if healthKitEnabled, status == .completed, let logItems = existing.items {
                 Task { try? await HealthKitManager.shared.saveNutritionSamples(items: logItems, date: day) }
             }
+            rescheduleNotificationsAfterLog()
             return
         }
 
@@ -171,6 +172,15 @@ struct DashboardView: View {
         if healthKitEnabled, status == .completed {
             Task { try? await HealthKitManager.shared.saveNutritionSamples(items: logItems, date: day) }
         }
+
+        rescheduleNotificationsAfterLog()
+    }
+
+    private func rescheduleNotificationsAfterLog() {
+        NotificationManager.shared.rescheduleAll(
+            activeProtocols: activeProtocols,
+            logs: Array(logs)
+        )
     }
 
     private func dateTitle(for date: Date) -> String {

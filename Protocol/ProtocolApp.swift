@@ -20,10 +20,39 @@ struct ProtocolApp: App {
         }
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    setupNotifications()
+                }
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                rescheduleNotificationsFromContext()
+            }
+        }
+    }
+
+    private func setupNotifications() {
+        Task {
+            _ = await NotificationManager.shared.requestAuthorization()
+            rescheduleNotificationsFromContext()
+        }
+    }
+
+    private func rescheduleNotificationsFromContext() {
+        let context = sharedModelContainer.mainContext
+        let planDescriptor = FetchDescriptor<ProtocolPlan>()
+        let logDescriptor = FetchDescriptor<ProtocolLog>()
+
+        let plans = (try? context.fetch(planDescriptor)) ?? []
+        let logs = (try? context.fetch(logDescriptor)) ?? []
+
+        let activePlans = plans.filter { $0.isActive }
+        NotificationManager.shared.rescheduleAll(activeProtocols: activePlans, logs: logs)
     }
 }
