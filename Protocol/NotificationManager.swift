@@ -60,6 +60,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let calendar = Calendar.current
         let now = Date()
         let today = calendar.startOfDay(for: now)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
 
         for plan in activeProtocols {
             guard plan.isActive else { continue }
@@ -71,50 +72,96 @@ final class NotificationManager: NSObject, @unchecked Sendable {
                 guard allItems.contains(where: { $0.slot == slot }) else { continue }
                 guard slotEnabled(for: plan.id, slot: slot) else { continue }
 
-                let isLogged = logs.contains { log in
+                let timeComps = time(for: plan.id, slot: slot)
+                let hour = timeComps.hour ?? defaultHour(for: slot)
+                let minute = timeComps.minute ?? 0
+
+                // --- Schedule for TODAY (if not logged and time hasn't passed) ---
+                let isTodayLogged = logs.contains { log in
                     log.protocolID == plan.id &&
                     log.slot == slot &&
                     calendar.isDate(log.date, inSameDayAs: today) &&
                     (log.status == .completed || log.status == .skipped || log.status == .missed)
                 }
-                if isLogged { continue }
 
-                let timeComps = time(for: plan.id, slot: slot)
-                var trigger = DateComponents()
-                trigger.hour = timeComps.hour ?? defaultHour(for: slot)
-                trigger.minute = timeComps.minute ?? 0
+                if !isTodayLogged {
+                    var todayTrigger = calendar.dateComponents([.year, .month, .day], from: today)
+                    todayTrigger.hour = hour
+                    todayTrigger.minute = minute
 
-                if let fireDate = calendar.nextDate(after: now.addingTimeInterval(-1), matching: trigger, matchingPolicy: .nextTime) {
-                    guard fireDate > now else { continue }
+                    if let fireDate = calendar.date(from: todayTrigger), fireDate > now {
+                        scheduleNotification(
+                            center: center,
+                            id: notificationID(for: plan.id, slot: slot, date: today),
+                            title: "\(plan.name) — \(slot.rawValue)",
+                            body: "Time to take your \(slot.rawValue.lowercased()) supplements",
+                            trigger: todayTrigger
+                        )
+                    }
                 }
 
-                let content = UNMutableNotificationContent()
-                content.title = "\(plan.name) — \(slot.rawValue)"
-                content.body = "Time to take your \(slot.rawValue.lowercased()) supplements"
-                content.sound = .default
+                // --- Always schedule for TOMORROW ---
+                let isTomorrowLogged = logs.contains { log in
+                    log.protocolID == plan.id &&
+                    log.slot == slot &&
+                    calendar.isDate(log.date, inSameDayAs: tomorrow) &&
+                    (log.status == .completed || log.status == .skipped || log.status == .missed)
+                }
 
-                let request = UNNotificationRequest(
-                    identifier: notificationID(for: plan.id, slot: slot),
-                    content: content,
-                    trigger: UNCalendarNotificationTrigger(dateMatching: trigger, repeats: false)
-                )
+                if !isTomorrowLogged {
+                    var tomorrowTrigger = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+                    tomorrowTrigger.hour = hour
+                    tomorrowTrigger.minute = minute
 
-                center.add(request) { error in
-                    if let error { print("Notif error \(plan.name)/\(slot.rawValue): \(error)") }
+                    scheduleNotification(
+                        center: center,
+                        id: notificationID(for: plan.id, slot: slot, date: tomorrow),
+                        title: "\(plan.name) — \(slot.rawValue)",
+                        body: "Time to take your \(slot.rawValue.lowercased()) supplements",
+                        trigger: tomorrowTrigger
+                    )
                 }
             }
         }
     }
 
+    private func scheduleNotification(center: UNUserNotificationCenter, id: String, title: String, body: String, trigger: DateComponents) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: id,
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: trigger, repeats: false)
+        )
+
+        center.add(request) { error in
+            if let error { print("Notif error \(id): \(error)") }
+        }
+    }
+
     func cancelNotifications(for protocolID: UUID) {
-        let ids = ProtocolSlot.allCases.map { notificationID(for: protocolID, slot: $0) }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
+        let center = UNUserNotificationCenter.current()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        var ids: [String] = []
+        for slot in ProtocolSlot.allCases {
+            ids.append(notificationID(for: protocolID, slot: slot, date: today))
+            ids.append(notificationID(for: protocolID, slot: slot, date: tomorrow))
+        }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     // MARK: - Private
 
-    private func notificationID(for protocolID: UUID, slot: ProtocolSlot) -> String {
-        "protocol_\(protocolID.uuidString)_\(slot.rawValue.lowercased())"
+    private func notificationID(for protocolID: UUID, slot: ProtocolSlot, date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd"
+        let dateStr = formatter.string(from: date)
+        return "protocol_\(protocolID.uuidString)_\(slot.rawValue.lowercased())_\(dateStr)"
     }
 
     private func slotEnabledKey(_ protocolID: UUID, slot: ProtocolSlot) -> String {
