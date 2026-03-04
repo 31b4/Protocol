@@ -21,12 +21,13 @@ struct PDFImportView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.voidBackground.ignoresSafeArea()
+                AppBackground()
+                    .ignoresSafeArea()
 
                 if isParsing {
                     ProgressView("Parsing PDF…")
                         .font(.system(.headline, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                 } else if let _ = importedData {
                     ImportReviewView(
                         reportDate: $reportDate,
@@ -86,11 +87,11 @@ struct PDFImportView: View {
 
             Text("Import a lab report")
                 .font(.system(.title3, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
 
             Text("Select a PDF to auto-detect biomarkers, values, units, and date.")
                 .font(.system(.body, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
@@ -190,7 +191,7 @@ private struct ImportReviewView: View {
                 }
                 if matchedItems.isEmpty {
                     Text("No matched biomarkers.")
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
 
@@ -200,7 +201,7 @@ private struct ImportReviewView: View {
                 }
                 if unmatchedItems.isEmpty {
                     Text("Everything matched the catalog.")
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
 
@@ -209,10 +210,11 @@ private struct ImportReviewView: View {
                     onSave()
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
+                .buttonStyle(PrimaryActionButtonStyle(tint: Color.neonCyan))
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.voidBackground)
+        .background(AppBackground())
         .sheet(isPresented: Binding(get: { editingIndex != nil }, set: { if !$0 { editingIndex = nil } })) {
             if let index = editingIndex {
                 ImportItemEditor(item: binding(for: index))
@@ -237,11 +239,11 @@ private struct ImportReviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayName)
                     .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
 
                 Text(item.valueDisplay)
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
             }
 
             Spacer()
@@ -272,37 +274,43 @@ private struct ImportItemEditor: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Detected") {
-                    Text(item.sourceLine)
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
+            ZStack {
+                AppBackground()
+                    .ignoresSafeArea()
 
-                Section("Biomarker") {
-                    if let selected = item.selectedTemplate ?? item.matchedTemplate {
-                        Text(selected.name)
-                            .font(.system(.headline, design: .rounded))
-                    } else {
-                        Text("No match")
+                Form {
+                    Section("Detected") {
+                        Text(item.sourceLine)
+                            .font(.system(.caption, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
 
-                    NavigationLink("Choose from catalog") {
-                        CatalogPicker(selectedTemplate: $item.selectedTemplate, searchText: $searchText)
+                    Section("Biomarker") {
+                        if let selected = item.selectedTemplate ?? item.matchedTemplate {
+                            Text(selected.name)
+                                .font(.system(.headline, design: .rounded))
+                        } else {
+                            Text("No match")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        NavigationLink("Choose from catalog") {
+                            CatalogPicker(selectedTemplate: $item.selectedTemplate, searchText: $searchText)
+                        }
                     }
-                }
 
-                Section("Result") {
-                    TextField("Value", text: $item.valueText)
-                        .keyboardType(.decimalPad)
+                    Section("Result") {
+                        TextField("Value", text: $item.valueText)
+                            .keyboardType(.decimalPad)
 
-                    Picker("Unit", selection: $item.unit) {
-                        ForEach(BiomarkerUnit.allCases) { unit in
-                            Text(unit.rawValue).tag(Optional(unit))
+                        Picker("Unit", selection: $item.unit) {
+                            ForEach(BiomarkerUnit.allCases) { unit in
+                                Text(unit.rawValue).tag(Optional(unit))
+                            }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Edit Result")
             .toolbar {
@@ -337,18 +345,24 @@ private struct CatalogPicker: View {
     }
 
     var body: some View {
-        List(filtered) { template in
-            Button {
-                selectedTemplate = template
-                dismiss()
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(template.name)
-                    Text(template.category.rawValue)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        ZStack {
+            AppBackground()
+                .ignoresSafeArea()
+
+            List(filtered) { template in
+                Button {
+                    selectedTemplate = template
+                    dismiss()
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(template.name)
+                        Text(template.category.rawValue)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            .scrollContentBackground(.hidden)
         }
         .searchable(text: $searchText)
         .navigationTitle("Choose Biomarker")

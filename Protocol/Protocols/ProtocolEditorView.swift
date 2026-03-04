@@ -29,16 +29,22 @@ struct ProtocolEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Protocol") {
-                    TextField("Name", text: $name)
+            ZStack {
+                AppBackground()
+                    .ignoresSafeArea()
+
+                Form {
+                    Section("Protocol") {
+                        TextField("Name", text: $name)
+                    }
+
+                    slotEditorSection(.morning, items: $morningItems)
+                    slotEditorSection(.daytime, items: $dayItems)
+                    slotEditorSection(.night, items: $nightItems)
+
+                    remindersEditorSection
                 }
-
-                slotEditorSection(.morning, items: $morningItems)
-                slotEditorSection(.daytime, items: $dayItems)
-                slotEditorSection(.night, items: $nightItems)
-
-                remindersEditorSection
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(protocolPlan == nil ? "New Protocol" : "Edit Protocol")
             .toolbar {

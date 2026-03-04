@@ -13,10 +13,14 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.voidBackground.ignoresSafeArea()
+                AppBackground()
+                    .ignoresSafeArea()
 
                 ScrollView {
                     LazyVStack(spacing: 16) {
+                        dailyOverviewCard
+                        insightsCard
+
                         sectionHeader("Active Protocols", systemImage: "bolt.heart")
 
                         if activeProtocols.isEmpty {
@@ -34,6 +38,8 @@ struct DashboardView: View {
                                 )
                             }
                         }
+
+                        nextUpCard
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
@@ -60,10 +66,10 @@ struct DashboardView: View {
                         HStack(spacing: 8) {
                             Text(dateTitle(for: selectedDate))
                                 .font(.system(.title3, design: .rounded).weight(.semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(Color.textSecondary)
                         }
                     }
                 }
@@ -103,14 +109,98 @@ struct DashboardView: View {
         protocols.filter { $0.isActive }
     }
 
+    private var dailyOverviewCard: some View {
+        let summary = dailySummary
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 16) {
+                ProgressRing(progress: summary.progress, size: 76, lineWidth: 10, tint: Color.neonCyan)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Daily Overview")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                    Text(summary.subtitle)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Spacer()
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                SummaryPill(title: "Completed", value: summary.completed, color: Color.neonCyan)
+                SummaryPill(title: "Pending", value: summary.pending, color: Color.textSecondary)
+                SummaryPill(title: "Missed", value: summary.missed, color: Color.neonAmber)
+                SummaryPill(title: "Skipped", value: summary.skipped, color: Color.neonPink)
+            }
+
+            HStack(spacing: 12) {
+                SummaryMiniCard(title: "Streak", value: "\(streakCount) days", icon: "flame.fill", tint: Color.neonAmber)
+                SummaryMiniCard(title: "Active", value: "\(activeProtocols.count) plans", icon: "bolt.heart.fill", tint: Color.neonCyan)
+            }
+        }
+        .glassCard()
+    }
+
+    private var nextUpCard: some View {
+        let items = upcomingSlots
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Next Up")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Image(systemName: "clock.badge.checkmark")
+                    .foregroundStyle(Color.neonCyan)
+            }
+
+            if items.isEmpty {
+                Text("You're all caught up.")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+            } else {
+                ForEach(items) { item in
+                    UpcomingSlotRow(item: item)
+                }
+            }
+        }
+        .glassCard()
+    }
+
+    private var insightsCard: some View {
+        NavigationLink {
+            InsightsView()
+        } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Insights")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                    Text("Trends across adherence, biology, and check-ins.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.neonCyan)
+            }
+        }
+        .buttonStyle(.plain)
+        .glassCard()
+    }
+
     private func sectionHeader(_ title: String, systemImage: String) -> some View {
         HStack {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.neonCyan.opacity(0.85))
-            Text(title)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.neonCyan)
+            Text(title.uppercased())
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(Color.textTertiary)
             Spacer()
         }
         .padding(.horizontal, 4)
@@ -124,15 +214,132 @@ struct DashboardView: View {
 
             Text("No active protocols")
                 .font(.system(.title3, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
 
             Text("Activate a protocol to see daily logging tasks.")
                 .font(.system(.body, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
         .glassCard()
+    }
+
+    private var dailySummary: DailySummary {
+        summary(for: selectedDate)
+    }
+
+    private var streakCount: Int {
+        var streak = 0
+        var currentDate = selectedDate.startOfDay
+
+        while streak < 365 {
+            let summary = summary(for: currentDate)
+            if summary.total == 0 { break }
+            if summary.missed > 0 || summary.pending > 0 { break }
+            streak += 1
+
+            guard let previous = Calendar.current.date(byAdding: .day, value: -1, to: currentDate) else { break }
+            currentDate = previous
+        }
+
+        return streak
+    }
+
+    private func summary(for date: Date) -> DailySummary {
+        let requirements = requiredSlots()
+        guard !requirements.isEmpty else {
+            return DailySummary(total: 0, completed: 0, skipped: 0, missed: 0, pending: 0)
+        }
+
+        let day = date.startOfDay
+        let activeIDs = Set(activeProtocols.map { $0.id })
+        let dayLogs = logs.filter { activeIDs.contains($0.protocolID) && Calendar.current.isDate($0.date, inSameDayAs: day) }
+
+        var completed = 0
+        var skipped = 0
+        var missed = 0
+        var pending = 0
+
+        for requirement in requirements {
+            if let log = dayLogs.first(where: { $0.protocolID == requirement.planID && $0.slot == requirement.slot }) {
+                switch log.status {
+                case .completed:
+                    completed += 1
+                case .skipped:
+                    skipped += 1
+                case .missed:
+                    missed += 1
+                case .undecided:
+                    pending += 1
+                }
+            } else {
+                pending += 1
+            }
+        }
+
+        return DailySummary(
+            total: requirements.count,
+            completed: completed,
+            skipped: skipped,
+            missed: missed,
+            pending: pending
+        )
+    }
+
+    private func requiredSlots() -> [SlotRequirement] {
+        var requirements: [SlotRequirement] = []
+        for plan in activeProtocols {
+            guard let version = plan.currentVersion else { continue }
+            for slot in ProtocolSlot.allCases {
+                if (version.items ?? []).contains(where: { $0.slot == slot }) {
+                    requirements.append(SlotRequirement(planID: plan.id, slot: slot))
+                }
+            }
+        }
+        return requirements
+    }
+
+    private var upcomingSlots: [UpcomingSlot] {
+        let now = Date()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+
+        var items: [UpcomingSlot] = []
+
+        for plan in activeProtocols {
+            guard let version = plan.currentVersion else { continue }
+            let allItems = version.items ?? []
+
+            for slot in ProtocolSlot.allCases {
+                guard allItems.contains(where: { $0.slot == slot }) else { continue }
+                guard NotificationManager.shared.slotEnabled(for: plan.id, slot: slot) else { continue }
+
+                let time = NotificationManager.shared.time(for: plan.id, slot: slot)
+                let hour = time.hour ?? 8
+                let minute = time.minute ?? 0
+
+                let todayTrigger = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: today) ?? today
+                let isLoggedToday = logs.contains { log in
+                    log.protocolID == plan.id &&
+                    log.slot == slot &&
+                    calendar.isDate(log.date, inSameDayAs: today) &&
+                    (log.status == .completed || log.status == .skipped || log.status == .missed)
+                }
+
+                let nextDate: Date
+                if isLoggedToday || todayTrigger <= now {
+                    nextDate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: tomorrow) ?? tomorrow
+                } else {
+                    nextDate = todayTrigger
+                }
+
+                items.append(UpcomingSlot(planName: plan.name, slot: slot, date: nextDate))
+            }
+        }
+
+        return items.sorted { $0.date < $1.date }.prefix(3).map { $0 }
     }
 
     private func setLogStatus(for plan: ProtocolPlan, slot: ProtocolSlot, items: [ProtocolItem], status: ProtocolLogStatus) {
@@ -204,6 +411,183 @@ struct DashboardView: View {
     }
 }
 
+private struct SlotRequirement: Hashable {
+    let planID: UUID
+    let slot: ProtocolSlot
+}
+
+private struct UpcomingSlot: Identifiable {
+    let id = UUID()
+    let planName: String
+    let slot: ProtocolSlot
+    let date: Date
+}
+
+private struct DailySummary {
+    let total: Int
+    let completed: Int
+    let skipped: Int
+    let missed: Int
+    let pending: Int
+
+    var resolved: Int {
+        completed + skipped
+    }
+
+    var progress: Double {
+        guard total > 0 else { return 0 }
+        return Double(resolved) / Double(total)
+    }
+
+    var subtitle: String {
+        guard total > 0 else { return "No scheduled slots" }
+        return "\(resolved) of \(total) resolved"
+    }
+}
+
+private struct UpcomingSlotRow: View {
+    let item: UpcomingSlot
+
+    private var timeText: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: item.date)
+    }
+
+    private var dayText: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(item.date) {
+            return "Today"
+        }
+        if calendar.isDateInTomorrow(item.date) {
+            return "Tomorrow"
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: item.date)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: slotIcon(item.slot))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.neonCyan)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.planName)
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.textPrimary)
+                Text("\(dayText) · \(item.slot.rawValue)")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            Spacer()
+
+            Text(timeText)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(BevelInsetSurface(cornerRadius: 12))
+        }
+    }
+
+    private func slotIcon(_ slot: ProtocolSlot) -> String {
+        switch slot {
+        case .morning: return "sun.max.fill"
+        case .daytime: return "sun.haze.fill"
+        case .night: return "moon.stars.fill"
+        }
+    }
+}
+
+private struct ProgressRing: View {
+    let progress: Double
+    let size: CGFloat
+    let lineWidth: CGFloat
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
+
+            Circle()
+                .trim(from: 0, to: max(progress, 0.001))
+                .stroke(
+                    tint,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            Text("\(Int(progress * 100))%")
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
+        .frame(width: size, height: size)
+        .animation(.easeOut(duration: 0.2), value: progress)
+    }
+}
+
+private struct SummaryPill: View {
+    let title: String
+    let value: Int
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+
+            Text(title)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+
+            Spacer()
+
+            Text("\(value)")
+                .font(.system(.headline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(BevelInsetSurface(cornerRadius: 14))
+    }
+}
+
+private struct SummaryMiniCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(tint)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+                Text(value)
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.textPrimary)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(BevelInsetSurface(cornerRadius: 16))
+    }
+}
+
 private struct ProtocolLogCard: View {
     let plan: ProtocolPlan
     let currentVersion: ProtocolVersion?
@@ -216,12 +600,12 @@ private struct ProtocolLogCard: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(plan.name)
                     .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
 
                 if let version = currentVersion {
                     Text(version.label)
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.textSecondary)
                 }
                 Spacer()
             }
@@ -237,7 +621,7 @@ private struct ProtocolLogCard: View {
             } else {
                 Text("No version set")
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(Color.textSecondary)
             }
         }
         .glassCard()
@@ -308,13 +692,13 @@ private struct ExpandableSlotRow: View {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: icon(for: slot))
-                        .foregroundStyle(Color.neonCyan.opacity(0.85))
+                        .foregroundStyle(Color.neonCyan)
                     Text(slot.rawValue)
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(Color.textSecondary)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.textTertiary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
                 Spacer()
@@ -332,7 +716,7 @@ private struct ExpandableSlotRow: View {
                     ForEach(items) { item in
                         Text("• \(item.supplementName) — \(item.amount, specifier: "%.2f") \(item.unit.rawValue)")
                             .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Color.textSecondary)
                     }
                 }
                 .padding(.top, 4)
@@ -404,34 +788,38 @@ private struct StatusButton: View {
                 .foregroundStyle(foregroundColor)
                 .frame(width: 36, height: 32)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(backgroundColor)
+                    ZStack {
+                        BevelInsetSurface(cornerRadius: 10)
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(accentColor.opacity(0.22))
+                        }
+                    }
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        .stroke(Color.white.opacity(isSelected ? 0.16 : 0.08), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
     }
 
     private var foregroundColor: Color {
-        if !isSelected { return .white.opacity(0.6) }
+        if !isSelected { return Color.textTertiary }
         switch label {
         case "✕": return Color.neonAmber
-        case "-": return Color.white.opacity(0.8)
+        case "-": return Color.textPrimary
         case "✓": return Color.neonCyan
-        default: return .white
+        default: return Color.textPrimary
         }
     }
 
-    private var backgroundColor: Color {
-        if !isSelected { return Color.glassBorder.opacity(0.4) }
+    private var accentColor: Color {
         switch label {
-        case "✕": return Color.neonAmber.opacity(0.25)
-        case "-": return Color.white.opacity(0.12)
-        case "✓": return Color.neonCyan.opacity(0.25)
-        default: return Color.glassBorder.opacity(0.4)
+        case "✕": return Color.neonAmber
+        case "-": return Color.white
+        case "✓": return Color.neonCyan
+        default: return Color.white
         }
     }
 }
@@ -466,14 +854,10 @@ private struct LiquidGlassDatePicker: View {
                     onClose()
                 }
                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                )
+                .background(BevelInsetSurface(cornerRadius: 18))
 
                 Spacer()
 
@@ -482,26 +866,14 @@ private struct LiquidGlassDatePicker: View {
                 } label: {
                     Image(systemName: "checkmark")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                         .padding(10)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                        )
+                        .background(BevelInsetSurface(cornerRadius: 18))
                 }
             }
         }
         .padding(20)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-            }
-        )
-        .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 16)
+        .background(BevelSurface(cornerRadius: 24))
     }
 }
 

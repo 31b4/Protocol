@@ -9,27 +9,18 @@ struct BiologyView: View {
     @State private var isAdding = false
     @State private var isImporting = false
     @State private var selectedReport: LabReport?
+    @State private var searchText = ""
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.voidBackground.ignoresSafeArea()
+                AppBackground()
+                    .ignoresSafeArea()
 
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        Button {
-                            isImporting = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "doc.badge.plus")
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                Text("Import PDF")
-                                    .font(.system(.headline, design: .rounded).weight(.semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .glassCard()
+                        biologyOverviewCard
+                        actionsCard
 
                         if reports.isEmpty == false {
                             sectionHeader("Saved Reports")
@@ -44,13 +35,15 @@ struct BiologyView: View {
 
                         if biomarkers.isEmpty {
                             emptyState
+                        } else if groupedBiomarkers.isEmpty {
+                            noResultsState
                         } else {
                             ForEach(groupedBiomarkers) { group in
                                 VStack(spacing: 12) {
                                     HStack {
                                         Text(group.category.rawValue)
                                             .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                            .foregroundStyle(.white.opacity(0.7))
+                                            .foregroundStyle(Color.textSecondary)
                                         Spacer()
                                     }
                                     ForEach(group.items) { item in
@@ -97,11 +90,98 @@ struct BiologyView: View {
                     PDFViewer(data: data)
                 } else {
                     Text("PDF not available")
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textSecondary)
                         .padding()
                 }
             }
         }
+    }
+
+    private var noResultsState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.neonCyan)
+
+            Text("No matches")
+                .font(.system(.headline, design: .rounded))
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Try a different name or category.")
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+        }
+        .glassCard()
+    }
+
+    private var actionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Color.textTertiary)
+                TextField("Search biomarkers", text: $searchText)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(Color.textPrimary)
+            }
+            .padding(10)
+            .background(BevelInsetSurface(cornerRadius: 14))
+
+            HStack(spacing: 10) {
+                Button {
+                    isImporting = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.badge.plus")
+                        Text("Import PDF")
+                    }
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                }
+                .buttonStyle(SecondaryActionButtonStyle())
+
+                Button {
+                    isAdding = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                        Text("Add Result")
+                    }
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                }
+                .buttonStyle(SecondaryActionButtonStyle())
+            }
+        }
+        .glassCard()
+    }
+
+    private var biologyOverviewCard: some View {
+        let summaries = biomarkerSummaries
+        let total = summaries.count
+        let outOfRange = summaries.filter { $0.rangeState == .high || $0.rangeState == .low }.count
+        let latestDate = biomarkers.first?.date
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Biology Overview")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(Color.neonCyan)
+            }
+
+            HStack(spacing: 12) {
+                MetricTile(title: "Tracked", value: "\(total)", tint: Color.neonCyan)
+                MetricTile(title: "Out of Range", value: "\(outOfRange)", tint: Color.neonAmber)
+            }
+
+            if let latestDate {
+                Text("Latest result \(latestDate, style: .date)")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+            }
+        }
+        .glassCard()
     }
 
     private var emptyState: some View {
@@ -112,11 +192,11 @@ struct BiologyView: View {
 
             Text("No biomarkers yet")
                 .font(.system(.title3, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.textPrimary)
 
             Text("Add your first lab result to begin tracking your biology.")
                 .font(.system(.body, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
@@ -126,32 +206,46 @@ struct BiologyView: View {
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(Color.textTertiary)
             Spacer()
         }
         .padding(.horizontal, 4)
     }
 
+    private var biomarkerSummaries: [BiomarkerSummary] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = trimmed.isEmpty ? biomarkers : biomarkers.filter { biomarker in
+            biomarker.name.localizedCaseInsensitiveContains(trimmed) ||
+            biomarker.category.rawValue.localizedCaseInsensitiveContains(trimmed)
+        }
+
+        let grouped = Dictionary(grouping: filtered) { $0.templateKey ?? $0.name }
+        let summaries = grouped.values.compactMap { values -> BiomarkerSummary? in
+            let sorted = values.sorted(by: { $0.date > $1.date })
+            guard let latest = sorted.first else { return nil }
+            let previous = sorted.dropFirst().first
+            return BiomarkerSummary(
+                name: latest.name,
+                templateKey: latest.templateKey,
+                category: latest.category,
+                latestValue: latest.value,
+                unit: latest.unit,
+                date: latest.date,
+                minReference: latest.minReference,
+                maxReference: latest.maxReference,
+                previousValue: previous?.value
+            )
+        }
+        return summaries.sorted { $0.name < $1.name }
+    }
+
     private var groupedBiomarkers: [BiomarkerCategoryGroup] {
-        let grouped = Dictionary(grouping: biomarkers) { $0.category }
+        let grouped = Dictionary(grouping: biomarkerSummaries) { $0.category }
         return grouped
             .map { category, items in
-                let byName = Dictionary(grouping: items) { $0.templateKey ?? $0.name }
-                let summaries = byName.values.compactMap { values -> BiomarkerSummary? in
-                    guard let latest = values.sorted(by: { $0.date > $1.date }).first else { return nil }
-                    return BiomarkerSummary(
-                        name: latest.name,
-                        templateKey: latest.templateKey,
-                        category: latest.category,
-                        latestValue: latest.value,
-                        unit: latest.unit,
-                        date: latest.date
-                    )
-                }
-                .sorted { $0.name < $1.name }
-
-                return BiomarkerCategoryGroup(category: category, items: summaries)
+                BiomarkerCategoryGroup(category: category, items: items.sorted { $0.name < $1.name })
             }
             .sorted { $0.category.rawValue < $1.category.rawValue }
     }
@@ -165,11 +259,11 @@ private struct BiomarkerRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(biomarker.name)
                     .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
 
                 Text(biomarker.category.rawValue)
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
             }
 
             Spacer()
@@ -178,15 +272,15 @@ private struct BiomarkerRow: View {
                 HStack(spacing: 6) {
                     Text("\(biomarker.value, specifier: "%.2f")")
                         .font(.system(.headline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     Text(biomarker.unit.rawValue)
                         .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color.textSecondary)
                 }
 
                 Text(biomarker.date, style: .date)
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
             }
         }
         .glassCard()
@@ -199,9 +293,15 @@ private struct BiomarkerSummaryRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(item.name)
-                    .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.white)
+                HStack(spacing: 8) {
+                    Text(item.name)
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+
+                    if item.rangeState != .unknown {
+                        RangeBadge(state: item.rangeState)
+                    }
+                }
             }
 
             Spacer()
@@ -210,15 +310,19 @@ private struct BiomarkerSummaryRow: View {
                 HStack(spacing: 6) {
                     Text("\(item.latestValue, specifier: "%.2f")")
                         .font(.system(.headline, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     Text(item.unit.rawValue)
                         .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Color.textSecondary)
                 }
 
                 Text(item.date, style: .date)
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
+
+                if let delta = item.delta {
+                    DeltaBadge(delta: delta)
+                }
             }
         }
         .glassCard()
@@ -234,11 +338,11 @@ private struct LabReportRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(report.title)
                     .font(.system(.headline, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.textPrimary)
 
                 Text(report.reportDate, style: .date)
                     .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textSecondary)
             }
 
             Spacer()
@@ -261,12 +365,242 @@ private struct BiomarkerSummary: Identifiable, Hashable {
     let latestValue: Double
     let unit: BiomarkerUnit
     let date: Date
+    let minReference: Double?
+    let maxReference: Double?
+    let previousValue: Double?
+
+    var rangeState: BiomarkerRangeState {
+        BiomarkerRangeState.evaluate(value: latestValue, min: minReference, max: maxReference)
+    }
+
+    var delta: Double? {
+        guard let previousValue else { return nil }
+        return latestValue - previousValue
+    }
 }
 
 private struct BiomarkerCategoryGroup: Identifiable {
     let id = UUID()
     let category: BiomarkerCategory
     let items: [BiomarkerSummary]
+}
+
+private enum BiomarkerRangeState: String {
+    case low = "Low"
+    case high = "High"
+    case inRange = "In Range"
+    case unknown = "Unknown"
+
+    static func evaluate(value: Double, min: Double?, max: Double?) -> BiomarkerRangeState {
+        guard let min, let max else { return .unknown }
+        if value < min { return .low }
+        if value > max { return .high }
+        return .inRange
+    }
+
+    var color: Color {
+        switch self {
+        case .low: return Color.neonAmber
+        case .high: return Color.neonPink
+        case .inRange: return Color.neonCyan
+        case .unknown: return Color.textTertiary
+        }
+    }
+}
+
+private struct RangeBadge: View {
+    let state: BiomarkerRangeState
+
+    var body: some View {
+        Text(state.rawValue)
+            .font(.system(.caption2, design: .rounded).weight(.semibold))
+            .foregroundStyle(state.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(BevelInsetSurface(cornerRadius: 10))
+    }
+}
+
+private struct MetricTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 6, height: 6)
+                Text(title)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+            }
+            Text(value)
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(BevelInsetSurface(cornerRadius: 16))
+    }
+}
+
+private struct DeltaBadge: View {
+    let delta: Double
+
+    private var direction: DeltaDirection {
+        if delta > 0 { return .up }
+        if delta < 0 { return .down }
+        return .flat
+    }
+
+    private var deltaText: String {
+        delta.formatted(.number.sign(strategy: .always(includingZero: true)).precision(.fractionLength(2)))
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: direction.icon)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+            Text(deltaText)
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+        }
+        .foregroundStyle(direction.color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(BevelInsetSurface(cornerRadius: 10))
+    }
+}
+
+private enum DeltaDirection {
+    case up
+    case down
+    case flat
+
+    var icon: String {
+        switch self {
+        case .up: return "arrow.up.right"
+        case .down: return "arrow.down.right"
+        case .flat: return "minus"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .up: return Color.neonCyan
+        case .down: return Color.neonAmber
+        case .flat: return Color.textTertiary
+        }
+    }
+}
+
+private struct BiomarkerTrendCard: View {
+    let records: [Biomarker]
+    let unit: BiomarkerUnit
+    let minReference: Double?
+    let maxReference: Double?
+
+    private var values: [Double] {
+        Array(records.suffix(30)).map { $0.value }
+    }
+
+    private var rangeText: String {
+        guard let minReference, let maxReference else { return "—" }
+        return "\(format(minReference, digits: 1)) - \(format(maxReference, digits: 1))"
+    }
+
+    var body: some View {
+        let latestValue = values.last ?? 0
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Trend")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Text("Recent")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.textTertiary)
+            }
+
+            ZStack {
+                BevelInsetSurface(cornerRadius: 16)
+                if values.count >= 2 {
+                    Sparkline(values: values)
+                        .padding(14)
+                } else {
+                    Text("Add more results to unlock the trend.")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
+            .frame(height: 110)
+
+            HStack(spacing: 12) {
+                TrendMetric(title: "Latest", value: "\(format(latestValue, digits: 2)) \(unit.rawValue)")
+                TrendMetric(title: "Range", value: rangeText)
+            }
+        }
+        .glassCard()
+    }
+
+    private func format(_ value: Double, digits: Int) -> String {
+        value.formatted(.number.precision(.fractionLength(digits)))
+    }
+}
+
+private struct TrendMetric: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+            Text(value)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(BevelInsetSurface(cornerRadius: 14))
+    }
+}
+
+private struct Sparkline: View {
+    let values: [Double]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let minValue = values.min() ?? 0
+            let maxValue = values.max() ?? 1
+            let range = max(maxValue - minValue, 0.0001)
+
+            let points = values.enumerated().map { index, value -> CGPoint in
+                let x = proxy.size.width * CGFloat(index) / CGFloat(max(values.count - 1, 1))
+                let y = proxy.size.height * (1 - CGFloat((value - minValue) / range))
+                return CGPoint(x: x, y: y)
+            }
+
+            Path { path in
+                guard let first = points.first else { return }
+                path.move(to: first)
+                for point in points.dropFirst() {
+                    path.addLine(to: point)
+                }
+            }
+            .stroke(
+                LinearGradient(
+                    colors: [Color.neonCyan, Color.neonPink],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+            )
+        }
+    }
 }
 
 private struct BiomarkerDetailView: View {
@@ -298,34 +632,67 @@ private struct BiomarkerDetailView: View {
     }
 
     var body: some View {
+        let sortedRecords = records.sorted(by: { $0.date < $1.date })
+        let latestRecord = sortedRecords.last
+
         ZStack {
-            Color.voidBackground.ignoresSafeArea()
+            AppBackground()
+                .ignoresSafeArea()
 
             List {
-                ForEach(records) { record in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
-                                Text("\(record.value, specifier: "%.2f")")
-                                    .font(.system(.headline, design: .rounded).weight(.semibold))
-                                    .foregroundStyle(.white)
-                                Text(record.unit.rawValue)
+                if let latest = latestRecord {
+                    Section {
+                        BiomarkerTrendCard(
+                            records: sortedRecords,
+                            unit: latest.unit,
+                            minReference: latest.minReference,
+                            maxReference: latest.maxReference
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
+                Section {
+                    ForEach(records) { record in
+                        let state = BiomarkerRangeState.evaluate(
+                            value: record.value,
+                            min: record.minReference,
+                            max: record.maxReference
+                        )
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    Text("\(record.value, specifier: "%.2f")")
+                                        .font(.system(.headline, design: .rounded).weight(.semibold))
+                                        .foregroundStyle(Color.textPrimary)
+                                    Text(record.unit.rawValue)
+                                        .font(.system(.subheadline, design: .rounded))
+                                        .foregroundStyle(Color.textSecondary)
+
+                                    if state != .unknown {
+                                        RangeBadge(state: state)
+                                    }
+                                }
+                                Text(record.date, style: .date)
                                     .font(.system(.subheadline, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(Color.textSecondary)
                             }
-                            Text(record.date, style: .date)
-                                .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.7))
+                            Spacer()
                         }
-                        Spacer()
-                    }
-                    .listRowBackground(Color.clear)
-                    .contextMenu {
-                        Button("Edit") { selectedBiomarkerForEdit = record }
-                        Button("Delete", role: .destructive) {
-                            modelContext.delete(record)
+                        .listRowBackground(Color.clear)
+                        .contextMenu {
+                            Button("Edit") { selectedBiomarkerForEdit = record }
+                            Button("Delete", role: .destructive) {
+                                modelContext.delete(record)
+                            }
                         }
                     }
+                } header: {
+                    Text("History")
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(Color.textTertiary)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -348,24 +715,30 @@ private struct EditBiomarkerSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Biomarker") {
-                    Text(biomarker.name)
-                        .font(.system(.headline, design: .rounded))
-                }
+            ZStack {
+                AppBackground()
+                    .ignoresSafeArea()
 
-                Section("Result") {
-                    TextField("Value", text: $valueText)
-                        .keyboardType(.decimalPad)
-
-                    Picker("Unit", selection: $selectedUnit) {
-                        ForEach(BiomarkerUnit.allCases) { unit in
-                            Text(unit.rawValue).tag(unit)
-                        }
+                Form {
+                    Section("Biomarker") {
+                        Text(biomarker.name)
+                            .font(.system(.headline, design: .rounded))
                     }
 
-                    DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
+                    Section("Result") {
+                        TextField("Value", text: $valueText)
+                            .keyboardType(.decimalPad)
+
+                        Picker("Unit", selection: $selectedUnit) {
+                            ForEach(BiomarkerUnit.allCases) { unit in
+                                Text(unit.rawValue).tag(unit)
+                            }
+                        }
+
+                        DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Edit Result")
             .toolbar {
@@ -425,7 +798,8 @@ private struct AddBiomarkerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.voidBackground.ignoresSafeArea()
+                AppBackground()
+                    .ignoresSafeArea()
 
                 List(filteredTemplates) { template in
                     NavigationLink(value: template) {
@@ -433,11 +807,11 @@ private struct AddBiomarkerSheet: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(template.name)
                                     .font(.system(.headline, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.textPrimary)
 
                                 Text(template.category.rawValue)
                                     .font(.system(.caption, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.6))
+                                    .foregroundStyle(Color.textSecondary)
                             }
 
                             Spacer()
@@ -467,49 +841,55 @@ private struct AddBiomarkerSheet: View {
 
     @ViewBuilder
     private func entryForm(for template: BiomarkerTemplate) -> some View {
-        Form {
-            Section("Biomarker") {
-                Text(template.name)
-                    .font(.system(.headline, design: .rounded))
-            }
+        ZStack {
+            AppBackground()
+                .ignoresSafeArea()
 
-            Section("Result") {
-                TextField("Value", text: $valueText)
-                    .keyboardType(.decimalPad)
-
-                Picker("Unit", selection: $selectedUnit) {
-                    ForEach(BiomarkerUnit.allCases) { unit in
-                        Text(unit.rawValue).tag(unit)
-                    }
+            Form {
+                Section("Biomarker") {
+                    Text(template.name)
+                        .font(.system(.headline, design: .rounded))
                 }
 
-                DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
-            }
+                Section("Result") {
+                    TextField("Value", text: $valueText)
+                        .keyboardType(.decimalPad)
 
-            Section {
-                Button("Save Result") {
-                    selectedUnit = selectedUnit
-                    guard let number = Self.numberFormatter.number(from: valueText) else {
-                        showInvalidValueAlert = true
-                        return
+                    Picker("Unit", selection: $selectedUnit) {
+                        ForEach(BiomarkerUnit.allCases) { unit in
+                            Text(unit.rawValue).tag(unit)
+                        }
                     }
-                    let value = number.doubleValue
 
-                    let biomarker = Biomarker(
-                        name: template.name,
-                        value: value,
-                        unit: selectedUnit,
-                        date: selectedDate,
-                        category: template.category,
-                        minReference: template.minReference,
-                        maxReference: template.maxReference,
-                        templateKey: template.id
-                    )
-                    modelContext.insert(biomarker)
-                    dismiss()
+                    DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
+
+                Section {
+                    Button("Save Result") {
+                        selectedUnit = selectedUnit
+                        guard let number = Self.numberFormatter.number(from: valueText) else {
+                            showInvalidValueAlert = true
+                            return
+                        }
+                        let value = number.doubleValue
+
+                        let biomarker = Biomarker(
+                            name: template.name,
+                            value: value,
+                            unit: selectedUnit,
+                            date: selectedDate,
+                            category: template.category,
+                            minReference: template.minReference,
+                            maxReference: template.maxReference,
+                            templateKey: template.id
+                        )
+                        modelContext.insert(biomarker)
+                        dismiss()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
+            .scrollContentBackground(.hidden)
         }
         .navigationTitle("New Result")
         .onAppear {

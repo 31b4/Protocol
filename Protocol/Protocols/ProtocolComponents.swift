@@ -44,18 +44,24 @@ struct SupplementPicker: View {
 
     var body: some View {
         NavigationStack {
-            List(filtered) { template in
-                Button {
-                    onSelect(template)
-                    dismiss()
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(template.name)
-                        Text(template.defaultUnit.rawValue)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            ZStack {
+                AppBackground()
+                    .ignoresSafeArea()
+
+                List(filtered) { template in
+                    Button {
+                        onSelect(template)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(template.name)
+                            Text(template.defaultUnit.rawValue)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .searchable(text: $searchText, prompt: "Search supplements")
             .navigationTitle("Add \(slot.rawValue)")

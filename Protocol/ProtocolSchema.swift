@@ -28,16 +28,35 @@ enum ProtocolSchemaV7: VersionedSchema {
     }
 }
 
+// MARK: - Schema V8 (Daily check-ins)
+
+enum ProtocolSchemaV8: VersionedSchema {
+    static var versionIdentifier: Schema.Version { .init(8, 0, 0) }
+    static var models: [any PersistentModel.Type] {
+        [
+            Biomarker.self,
+            LabReport.self,
+            ProtocolPlan.self,
+            ProtocolVersion.self,
+            ProtocolItem.self,
+            ProtocolLog.self,
+            ProtocolLogItem.self,
+            DailyCheckIn.self
+        ]
+    }
+}
+
 // MARK: - Migration Plan
 
 enum ProtocolMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [ProtocolSchemaV1.self, ProtocolSchemaV7.self]
+        [ProtocolSchemaV1.self, ProtocolSchemaV7.self, ProtocolSchemaV8.self]
     }
 
     static var stages: [MigrationStage] {
         [
-            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV7.self)
+            .lightweight(fromVersion: ProtocolSchemaV1.self, toVersion: ProtocolSchemaV7.self),
+            .lightweight(fromVersion: ProtocolSchemaV7.self, toVersion: ProtocolSchemaV8.self)
         ]
     }
 }

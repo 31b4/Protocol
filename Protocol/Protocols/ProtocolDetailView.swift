@@ -28,59 +28,72 @@ struct ProtocolDetailView: View {
         let currentVersion = protocolPlan.currentVersion
         let displayVersion = selectedVersion ?? currentVersion
 
-        ScrollView {
-            LazyVStack(spacing: 20) {
+        ZStack {
+            AppBackground()
+                .ignoresSafeArea()
 
-                // MARK: - Supplement Slots
-                if let version = displayVersion {
-                    let morning = items(for: .morning, in: version)
-                    let day = items(for: .daytime, in: version)
-                    let night = items(for: .night, in: version)
+            ScrollView {
+                LazyVStack(spacing: 20) {
+                    summaryCard
 
-                    if !morning.isEmpty {
-                        collapsibleSlot(.morning, items: morning, expanded: $morningExpanded)
+                    // MARK: - Supplement Slots
+                    if let version = displayVersion {
+                        let morning = items(for: .morning, in: version)
+                        let day = items(for: .daytime, in: version)
+                        let night = items(for: .night, in: version)
+
+                        if !morning.isEmpty {
+                            collapsibleSlot(.morning, items: morning, expanded: $morningExpanded)
+                        }
+                        if !day.isEmpty {
+                            collapsibleSlot(.daytime, items: day, expanded: $dayExpanded)
+                        }
+                        if !night.isEmpty {
+                            collapsibleSlot(.night, items: night, expanded: $nightExpanded)
+                        }
                     }
-                    if !day.isEmpty {
-                        collapsibleSlot(.daytime, items: day, expanded: $dayExpanded)
+
+                    // MARK: - Weekly Adherence
+                    if let version = displayVersion {
+                        weeklyAdherenceSection(version: version)
                     }
-                    if !night.isEmpty {
-                        collapsibleSlot(.night, items: night, expanded: $nightExpanded)
+
+                    // MARK: - Reminders
+                    if let version = displayVersion {
+                        remindersSection(version: version)
                     }
+
+                    // MARK: - Version
+                    versionsSection(currentVersion: currentVersion)
                 }
-
-                // MARK: - Reminders
-                if let version = displayVersion {
-                    remindersSection(version: version)
-                }
-
-                // MARK: - Version
-                versionsSection(currentVersion: currentVersion)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 32)
         }
-        .background(Color.voidBackground)
         .navigationTitle(protocolPlan.name)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text(protocolPlan.name)
                         .font(.system(.headline, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     HStack(spacing: 8) {
                         if let version = displayVersion {
                             Text(version.label)
                                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(Color.textSecondary)
                         }
-                        Button(protocolPlan.isActive ? "Active" : "Inactive") {
+                        Button {
                             protocolPlan.isActive.toggle()
                             protocolPlan.updatedAt = Date()
                             rescheduleAll()
+                        } label: {
+                            StatusPill(
+                                text: protocolPlan.isActive ? "Active" : "Inactive",
+                                tint: protocolPlan.isActive ? Color.neonCyan : Color.neonAmber
+                            )
                         }
-                        .font(.system(.caption, design: .rounded).weight(.semibold))
-                        .foregroundStyle(protocolPlan.isActive ? Color.neonCyan : Color.neonAmber)
                     }
                 }
             }
@@ -110,6 +123,37 @@ struct ProtocolDetailView: View {
         }
     }
 
+    private var summaryCard: some View {
+        let version = selectedVersion ?? protocolPlan.currentVersion
+        let items = version?.items ?? []
+        let slots = Set(items.map { $0.slot })
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(protocolPlan.name)
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                    Text(version?.label ?? "No version")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Spacer()
+
+                Button("Edit") { isEditing = true }
+                    .buttonStyle(SecondaryActionButtonStyle())
+            }
+
+            HStack(spacing: 12) {
+                SummaryMetric(title: "Supplements", value: "\(items.count)")
+                SummaryMetric(title: "Slots", value: "\(slots.count)")
+                SummaryMetric(title: "Updated", value: protocolPlan.updatedAt.formatted(.dateTime.month().day()))
+            }
+        }
+        .glassCard()
+    }
+
     // MARK: - Collapsible Slot Section
 
     @ViewBuilder
@@ -129,20 +173,20 @@ struct ProtocolDetailView: View {
 
                     Text(slot.rawValue)
                         .font(.system(.headline, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
 
                     Text("\(items.count)")
                         .font(.system(.caption, design: .rounded).weight(.bold))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.08), in: Capsule())
+                        .background(BevelInsetSurface(cornerRadius: 10))
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(Color.textTertiary)
                         .rotationEffect(.degrees(expanded.wrappedValue ? 90 : 0))
                 }
             }
@@ -159,16 +203,16 @@ struct ProtocolDetailView: View {
 
                             Text(item.supplementName)
                                 .font(.system(.subheadline, design: .rounded).weight(.medium))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
 
                             Spacer()
 
                             Text("\(item.amount, specifier: "%g") \(item.unit.rawValue)")
                                 .font(.system(.caption, design: .rounded).weight(.semibold))
-                                .foregroundStyle(.white.opacity(0.55))
+                                .foregroundStyle(Color.textSecondary)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.06), in: Capsule())
+                                .background(BevelInsetSurface(cornerRadius: 10))
                         }
                         .padding(.vertical, 4)
                     }
@@ -193,10 +237,10 @@ struct ProtocolDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: "bell.fill")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.neonCyan.opacity(0.85))
+                    .foregroundStyle(Color.neonCyan)
                 Text("Reminders")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textTertiary)
             }
 
             VStack(spacing: 14) {
@@ -217,12 +261,78 @@ struct ProtocolDetailView: View {
                         Text("You won't be notified for slots already taken or skipped.")
                             .font(.system(.caption2, design: .rounded))
                     }
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Color.textTertiary)
                     .padding(.top, 2)
                 }
             }
             .glassCard()
         }
+    }
+
+    // MARK: - Weekly Adherence
+
+    private func weeklyAdherenceSection(version: ProtocolVersion) -> some View {
+        let days = adherenceDays(for: version)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.neonCyan)
+                Text("Weekly Adherence")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.textTertiary)
+            }
+
+            HStack(spacing: 8) {
+                ForEach(days) { day in
+                    AdherenceDayPill(day: day)
+                }
+            }
+
+            Text("Completed includes skipped slots.")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.textTertiary)
+        }
+        .glassCard()
+    }
+
+    private func adherenceDays(for version: ProtocolVersion) -> [AdherenceDay] {
+        let requiredSlots = ProtocolSlot.allCases.filter { slot in
+            (version.items ?? []).contains { $0.slot == slot }
+        }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let status = adherenceStatus(for: date, requiredSlots: requiredSlots)
+            return AdherenceDay(date: date, status: status)
+        }
+    }
+
+    private func adherenceStatus(for date: Date, requiredSlots: [ProtocolSlot]) -> AdherenceStatus {
+        guard !requiredSlots.isEmpty else { return .none }
+
+        let dayLogs = allLogs.filter {
+            $0.protocolID == protocolPlan.id &&
+            Calendar.current.isDate($0.date, inSameDayAs: date)
+        }
+
+        let statuses = requiredSlots.map { slot in
+            dayLogs.first(where: { $0.slot == slot })?.status
+        }
+
+        if statuses.contains(where: { $0 == .missed }) {
+            return .missed
+        }
+        if statuses.allSatisfy({ $0 == .completed || $0 == .skipped }) {
+            return .complete
+        }
+        if statuses.contains(where: { $0 == .completed || $0 == .skipped }) {
+            return .partial
+        }
+        return .none
     }
 
     @ViewBuilder
@@ -232,12 +342,12 @@ struct ProtocolDetailView: View {
             HStack(spacing: 10) {
                 Image(systemName: icon(for: slot))
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(enabled.wrappedValue ? Color.neonCyan : .white.opacity(0.3))
+                    .foregroundStyle(enabled.wrappedValue ? Color.neonCyan : Color.textTertiary)
                     .frame(width: 22)
 
                 Text(slot.rawValue)
                     .font(.system(.subheadline, design: .rounded).weight(.medium))
-                    .foregroundStyle(enabled.wrappedValue ? .white : .white.opacity(0.4))
+                    .foregroundStyle(enabled.wrappedValue ? Color.textPrimary : Color.textTertiary)
 
                 Spacer()
 
@@ -250,12 +360,17 @@ struct ProtocolDetailView: View {
                     }
             }
 
+            Text(nextReminderLabel(for: slot, time: time.wrappedValue, enabled: enabled.wrappedValue))
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             // Time picker — only if enabled
             if enabled.wrappedValue {
                 DatePicker(selection: time, displayedComponents: .hourAndMinute) {
                     Text("Notify at")
                         .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .onChange(of: time.wrappedValue) { _, newValue in
                     NotificationManager.shared.setTime(
@@ -278,10 +393,10 @@ struct ProtocolDetailView: View {
             HStack(spacing: 8) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.neonCyan.opacity(0.85))
+                    .foregroundStyle(Color.neonCyan)
                 Text("Versions")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.textTertiary)
             }
 
             Button {
@@ -290,10 +405,10 @@ struct ProtocolDetailView: View {
                 HStack {
                     Text((selectedVersion ?? currentVersion)?.label ?? "Select")
                         .font(.system(.headline, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down")
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.textTertiary)
                 }
             }
             .glassCard()
@@ -333,6 +448,139 @@ struct ProtocolDetailView: View {
         case .night: return "moon.stars.fill"
         }
     }
+
+    private func nextReminderLabel(for slot: ProtocolSlot, time: Date, enabled: Bool) -> String {
+        guard enabled else { return "Reminders off" }
+        guard let date = nextReminderDate(for: slot, time: time) else { return "Not scheduled" }
+
+        let calendar = Calendar.current
+        let day: String
+        if calendar.isDateInToday(date) {
+            day = "Today"
+        } else if calendar.isDateInTomorrow(date) {
+            day = "Tomorrow"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEE"
+            day = formatter.string(from: date)
+        }
+
+        return "Next: \(day) \(timeFormatter.string(from: date))"
+    }
+
+    private func nextReminderDate(for slot: ProtocolSlot, time: Date) -> Date? {
+        let calendar = Calendar.current
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
+        let comps = calendar.dateComponents([.hour, .minute], from: time)
+        guard let hour = comps.hour, let minute = comps.minute else { return nil }
+
+        let todayTrigger = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: today) ?? today
+        let isLoggedToday = allLogs.contains { log in
+            log.protocolID == protocolPlan.id &&
+            log.slot == slot &&
+            calendar.isDate(log.date, inSameDayAs: today) &&
+            (log.status == .completed || log.status == .skipped || log.status == .missed)
+        }
+
+        if isLoggedToday || todayTrigger <= now {
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: tomorrow)
+        }
+
+        return todayTrigger
+    }
+
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }
+}
+
+private struct StatusPill: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(.caption2, design: .rounded).weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(BevelInsetSurface(cornerRadius: 10))
+    }
+}
+
+private struct SummaryMetric: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+            Text(value)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(BevelInsetSurface(cornerRadius: 12))
+    }
+}
+
+private struct AdherenceDay: Identifiable {
+    let id = UUID()
+    let date: Date
+    let status: AdherenceStatus
+
+    var symbol: String {
+        String(Self.formatter.string(from: date).prefix(1))
+    }
+
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "E"
+        return formatter
+    }()
+}
+
+private enum AdherenceStatus {
+    case complete
+    case partial
+    case missed
+    case none
+
+    var color: Color {
+        switch self {
+        case .complete: return Color.neonCyan
+        case .partial: return Color.neonAmber
+        case .missed: return Color.neonPink
+        case .none: return Color.textTertiary
+        }
+    }
+}
+
+private struct AdherenceDayPill: View {
+    let day: AdherenceDay
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(day.symbol)
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(Color.textSecondary)
+
+            Circle()
+                .fill(day.status.color)
+                .frame(width: 10, height: 10)
+        }
+        .frame(width: 36)
+        .padding(.vertical, 8)
+        .background(BevelInsetSurface(cornerRadius: 12))
+    }
 }
 
 private struct ProtocolVersionPicker: View {
@@ -344,28 +592,34 @@ private struct ProtocolVersionPicker: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(versions) { version in
-                    Button {
-                        selectedVersion = version
-                        dismiss()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(version.label)
-                                    .font(.system(.headline, design: .rounded))
-                                Text(version.createdAt, style: .date)
-                                    .font(.system(.subheadline, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if version.id == (selectedVersion?.id ?? currentVersion?.id) {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.neonCyan)
+            ZStack {
+                AppBackground()
+                    .ignoresSafeArea()
+
+                List {
+                    ForEach(versions) { version in
+                        Button {
+                            selectedVersion = version
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(version.label)
+                                        .font(.system(.headline, design: .rounded))
+                                    Text(version.createdAt, style: .date)
+                                        .font(.system(.subheadline, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if version.id == (selectedVersion?.id ?? currentVersion?.id) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.neonCyan)
+                                }
                             }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Versions")
             .toolbar {

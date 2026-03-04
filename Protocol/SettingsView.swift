@@ -10,7 +10,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.voidBackground.ignoresSafeArea()
+                AppBackground()
+                    .ignoresSafeArea()
 
                 List {
                     Section("Health") {
@@ -25,23 +26,23 @@ struct SettingsView: View {
                         })) {
                             Text("Sync with Apple Health")
                                 .font(.system(.headline, design: .rounded))
+                                .foregroundStyle(Color.textPrimary)
                         }
 
                         Text("We only request nutrition write access. Your data stays private.")
                             .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Color.textSecondary)
                     }
 
                     Section("Nutrition Types") {
                         ForEach(HealthKitNutritionTypes.identifiers, id: \.self) { type in
                             Text(type.displayName)
                                 .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.textPrimary)
                         }
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .background(Color.voidBackground)
             }
             .navigationTitle("Settings")
             .toolbar {
@@ -53,9 +54,9 @@ struct SettingsView: View {
                 if isRequesting {
                     ProgressView("Requesting access…")
                         .font(.system(.headline, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.textPrimary)
                         .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(BevelSurface(cornerRadius: 14))
                 }
             }
             .alert("HealthKit Error", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
